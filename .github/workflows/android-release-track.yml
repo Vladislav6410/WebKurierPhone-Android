@@ -13,10 +13,10 @@ on:
           - beta
           - production
       version_name:
-        description: "Version name (e.g., 0.1.0)"
+        description: "Optional override (e.g., 0.1.0)"
         required: false
       version_code:
-        description: "Version code (integer)"
+        description: "Optional override (integer)"
         required: false
 
 concurrency:
@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   build-aab:
-    name: Build Release AAB
+    name: Build Release AAB (CI versioning)
     runs-on: ubuntu-latest
 
     steps:
@@ -47,57 +47,64 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      # Optional: override versionName/versionCode at build time
-      # This avoids editing files from a mobile device.
-      - name: 🏷 Prepare version overrides (optional)
+      - name: 🏷 Compute CI version (run_number)
         id: ver
         run: |
           TRACK="${{ inputs.track }}"
-          VN="${{ inputs.version_name }}"
-          VC="${{ inputs.version_code }}"
+          RUN="${{ github.run_number }}"
+
+          # Auto versioning defaults:
+          AUTO_CODE="$RUN"
+          AUTO_NAME="0.1.0+build.$RUN-$TRACK"
+
+          # Manual overrides (optional):
+          OVERRIDE_NAME="${{ inputs.version_name }}"
+          OVERRIDE_CODE="${{ inputs.version_code }}"
+
+          if [ -n "$OVERRIDE_CODE" ]; then
+            CODE="$OVERRIDE_CODE"
+          else
+            CODE="$AUTO_CODE"
+          fi
+
+          if [ -n "$OVERRIDE_NAME" ]; then
+            NAME="$OVERRIDE_NAME"
+          else
+            NAME="$AUTO_NAME"
+          fi
 
           echo "track=$TRACK" >> $GITHUB_OUTPUT
-          echo "versionName=$VN" >> $GITHUB_OUTPUT
-          echo "versionCode=$VC" >> $GITHUB_OUTPUT
+          echo "versionCode=$CODE" >> $GITHUB_OUTPUT
+          echo "versionName=$NAME" >> $GITHUB_OUTPUT
 
-      - name: 🏗 Build Release AAB
-        env:
-          WK_TRACK: ${{ steps.ver.outputs.track }}
-          WK_VERSION_NAME: ${{ steps.ver.outputs.versionName }}
-          WK_VERSION_CODE: ${{ steps.ver.outputs.versionCode }}
+          echo "Using track=$TRACK"
+          echo "Using versionCode=$CODE"
+          echo "Using versionName=$NAME"
+
+      - name: 🏗 Build Release AAB (with CI version)
         run: |
-          echo "Track: $WK_TRACK"
-          echo "VersionName override: $WK_VERSION_NAME"
-          echo "VersionCode override: $WK_VERSION_CODE"
-
-          # If you later add version overrides into Gradle via -P,
-          # we can wire them here. For now, build with repo versions.
-          gradle :app:bundleRelease
+          gradle :app:bundleRelease \
+            -PciVersionCode=${{ steps.ver.outputs.versionCode }} \
+            -PciVersionName="${{ steps.ver.outputs.versionName }}"
 
       - name: 📎 Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WebKurierPhone-Android-release-aab-${{ inputs.track }}
+          name: WebKurierPhone-Android-release-aab-${{ steps.ver.outputs.track }}
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
       - name: 📝 Release notes stub
         run: |
-          echo "Track: ${{ inputs.track }}" > release-notes.txt
+          echo "Track: ${{ steps.ver.outputs.track }}" > release-notes.txt
+          echo "VersionName: ${{ steps.ver.outputs.versionName }}" >> release-notes.txt
+          echo "VersionCode: ${{ steps.ver.outputs.versionCode }}" >> release-notes.txt
           echo "Commit: ${{ github.sha }}" >> release-notes.txt
-          echo "This workflow currently builds AAB and uploads as artifact." >> release-notes.txt
-          echo "Play Store upload can be enabled after adding service account secrets." >> release-notes.txt
 
       - name: 📎 Upload release notes
         uses: actions/upload-artifact@v4
         with:
-          name: WebKurierPhone-Android-release-notes-${{ inputs.track }}
+          name: WebKurierPhone-Android-release-notes-${{ steps.ver.outputs.track }}
           path: release-notes.txt
           if-no-files-found: error
 
-  # Play Console upload is intentionally NOT enabled by default.
-  # Reason: requires secrets and Play Console setup.
-  # When you're ready, we add:
-  # - GOOGLE_PLAY_SERVICE_ACCOUNT_JSON (secret)
-  # - packageName
-  # - and use a Play Publisher action.
