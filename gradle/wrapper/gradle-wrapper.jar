@@ -1,0 +1,23 @@
+# WebKurierPhone-Android — ProGuard rules
+# Minimal safe configuration
+
+# Keep Kotlin metadata (important for reflection, coroutines, Compose)
+-keep class kotlin.Metadata { *; }
+
+# Keep Jetpack Compose classes
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
+
+# Keep OkHttp (network layer)
+-keep class okhttp3.** { *; }
+-dontwarn okhttp3.**
+
+# Keep JSON (Android built-in)
+-dontwarn org.json.**
+
+# Disable warnings for unused annotations
+-dontwarn javax.annotation.**
+
+# NOTE:
+# Shrinking is disabled in debug builds.
+# Release rules will be extended later if needed.
