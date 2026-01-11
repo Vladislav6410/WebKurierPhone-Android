@@ -1,0 +1,39 @@
+# =========================
+# Android / Gradle
+# =========================
+.gradle/
+build/
+*/build/
+captures/
+
+# =========================
+# Android Studio
+# =========================
+.idea/
+*.iml
+local.properties
+
+# =========================
+# Keystores (NEVER COMMIT)
+# =========================
+*.jks
+*.keystore
+
+# =========================
+# Environment / Secrets
+# =========================
+config/env.local.json
+config/env.*.local.json
+
+# =========================
+# Logs & Temp
+# =========================
+*.log
+tmp/
+.cache/
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
