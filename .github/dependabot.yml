@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # Gradle dependencies (app module)
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "android"
+    commit-message:
+      prefix: "deps"
+    ignore:
+      # Avoid noisy pre-releases unless explicitly needed
+      - dependency-name: "*"
+        update-types: ["version-update:semver-prerelease"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "ci"
