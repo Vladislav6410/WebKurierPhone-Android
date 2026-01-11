@@ -8,32 +8,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import com.webkurier.android.core.AppDependencies
+import com.webkurier.android.ui.AppRoute
+import com.webkurier.android.ui.AppScaffold
+import com.webkurier.android.ui.CafeScreen
+import com.webkurier.android.ui.DreamMakerScreen
+import com.webkurier.android.ui.HRScreen
 import com.webkurier.android.ui.HomeScreen
+import com.webkurier.android.ui.LessonsScreen
+import com.webkurier.android.ui.RomanticScreen
 import com.webkurier.android.ui.SettingsScreen
 import com.webkurier.android.ui.TranslatorScreen
 import com.webkurier.android.ui.VoiceCallScreen
-import com.webkurier.android.ui.LessonsScreen
 import com.webkurier.android.ui.WalletScreen
-import com.webkurier.android.ui.DreamMakerScreen
-import com.webkurier.android.ui.RomanticScreen
-import com.webkurier.android.ui.HRScreen
-import com.webkurier.android.ui.CafeScreen
-import com.webkurier.android.ui.AppNav
-import com.webkurier.android.ui.AppRoute
-import com.webkurier.android.ui.rememberAppNavState
 import com.webkurier.android.ui.WebKurierTheme
-import com.webkurier.android.ui.AppScaffold
-import com.webkurier.android.core.AppDependencies
+import com.webkurier.android.ui.rememberAppNavState
 
 /**
  * MainActivity
  *
  * Entry point of WebKurierPhone-Android.
- *
- * RULES:
- * - UI is client-only
- * - Business logic remains in Core/PhoneCore
- * - Tokens stored via SecureStore (encrypted)
  */
 class MainActivity : ComponentActivity() {
 
@@ -90,3 +84,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
