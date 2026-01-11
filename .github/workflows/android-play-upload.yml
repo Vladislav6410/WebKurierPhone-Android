@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   upload:
-    name: Build AAB + Upload to Play
+    name: Build AAB + Upload to Play (CI versioning)
     runs-on: ubuntu-latest
 
     steps:
@@ -50,6 +50,20 @@ jobs:
         with:
           gradle-version: "8.7"
 
+      - name: 🏷 Compute CI version (run_number)
+        id: ver
+        run: |
+          TRACK="${{ inputs.track }}"
+          RUN="${{ github.run_number }}"
+
+          echo "track=$TRACK" >> $GITHUB_OUTPUT
+          echo "versionCode=$RUN" >> $GITHUB_OUTPUT
+          echo "versionName=0.1.0+build.$RUN-$TRACK" >> $GITHUB_OUTPUT
+
+          echo "Using track=$TRACK"
+          echo "Using versionCode=$RUN"
+          echo "Using versionName=0.1.0+build.$RUN-$TRACK"
+
       - name: 🔐 Decode keystore (from secrets)
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -60,7 +74,7 @@ jobs:
           fi
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/release-keystore.jks
 
-      - name: 🏗 Build signed Release AAB
+      - name: 🏗 Build signed Release AAB (CI version)
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -71,7 +85,7 @@ jobs:
             exit 1
           fi
 
-          # Create signing.properties for Gradle (keeps secrets out of repo)
+          # signing properties file for Gradle (not committed)
           cat > signing.properties <<EOF
           storeFile=release-keystore.jks
           storePassword=$ANDROID_KEYSTORE_PASSWORD
@@ -79,8 +93,10 @@ jobs:
           keyPassword=$ANDROID_KEY_PASSWORD
           EOF
 
-          # Build AAB
-          gradle :app:bundleRelease -PsigningPropertiesFile=signing.properties
+          gradle :app:bundleRelease \
+            -PsigningPropertiesFile=signing.properties \
+            -PciVersionCode=${{ steps.ver.outputs.versionCode }} \
+            -PciVersionName="${{ steps.ver.outputs.versionName }}"
 
       - name: 📦 Locate AAB
         id: aab
@@ -101,15 +117,11 @@ jobs:
           releaseFiles: ${{ steps.aab.outputs.path }}
           track: ${{ inputs.track }}
           status: ${{ inputs.status }}
-          # Optional (enable later if needed):
-          # inAppUpdatePriority: 2
-          # userFraction: 0.1
-          # whatsNewDirectory: distribution/whatsnew
 
-      - name: 📎 Upload AAB artifact (for traceability)
+      - name: 📎 Upload AAB artifact (traceability)
         uses: actions/upload-artifact@v4
         with:
-          name: WebKurierPhone-Android-aab-uploaded-${{ inputs.track }}
+          name: WebKurierPhone-Android-aab-uploaded-${{ steps.ver.outputs.track }}-build-${{ steps.ver.outputs.versionCode }}
           path: ${{ steps.aab.outputs.path }}
           if-no-files-found: error
 
@@ -117,3 +129,4 @@ jobs:
         if: always()
         run: |
           rm -f app/release-keystore.jks signing.properties
+
