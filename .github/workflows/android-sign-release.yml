@@ -1,0 +1,102 @@
+name: 🔏 Sign Release APK (Hybrid Keystore)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: android-sign-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sign-release:
+    name: Build + Sign Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: 🧰 Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.7"
+
+      - name: 🔐 Decode keystore (from secrets)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "Missing secret ANDROID_KEYSTORE_BASE64"
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/release-keystore.jks
+          ls -la app/release-keystore.jks
+
+      - name: 🏗 Build Release APK (unsigned)
+        run: |
+          gradle :app:assembleRelease
+
+      - name: 🔏 Sign APK
+        env:
+          STORE_FILE: app/release-keystore.jks
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "Missing signing secrets (ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD)"
+            exit 1
+          fi
+
+          APK_PATH=$(ls -1 app/build/outputs/apk/release/*.apk | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Release APK not found"
+            ls -R app/build/outputs/apk || true
+            exit 1
+          fi
+
+          echo "APK_PATH=$APK_PATH"
+
+          # Sign with apksigner (part of Android build-tools on runner via Gradle/AGP toolchain)
+          # We use Gradle-installed SDK build-tools path from ANDROID_HOME
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -n 1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "apksigner not found in ANDROID_HOME/build-tools"
+            exit 1
+          fi
+
+          "$APKSIGNER" sign \
+            --ks "$STORE_FILE" \
+            --ks-pass "pass:$STORE_PASSWORD" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass "pass:$KEY_PASSWORD" \
+            "$APK_PATH"
+
+          # Verify signature
+          "$APKSIGNER" verify --verbose "$APK_PATH"
+
+          # Rename to a stable artifact name
+          mkdir -p app/build/outputs/signed
+          cp "$APK_PATH" app/build/outputs/signed/WebKurierPhone-Android-release-signed.apk
+
+      - name: 📎 Upload signed APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebKurierPhone-Android-release-signed-apk
+          path: app/build/outputs/signed/WebKurierPhone-Android-release-signed.apk
+          if-no-files-found: error
+
+      - name: 🧹 Cleanup keystore
+        if: always()
+        run: |
+          rm -f app/release-keystore.jks
