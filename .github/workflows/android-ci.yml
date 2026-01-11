@@ -1,0 +1,61 @@
+name: 🤖 Android CI (WebKurierPhone-Android)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build + Lint + Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      # We intentionally avoid relying on gradle-wrapper.jar here,
+      # because the repository is being assembled from a mobile device (iPhone).
+      # This installs Gradle and runs tasks directly.
+      - name: 🧰 Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.7"
+
+      - name: 🧪 Verify Gradle
+        run: |
+          gradle --version
+
+      - name: 🧹 Lint (Android)
+        run: |
+          gradle :app:lintDebug
+
+      - name: ✅ Unit tests
+        run: |
+          gradle :app:testDebugUnitTest
+
+      - name: 🏗 Build Debug APK
+        run: |
+          gradle :app:assembleDebug
+
+      - name: 📎 Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebKurierPhone-Android-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
