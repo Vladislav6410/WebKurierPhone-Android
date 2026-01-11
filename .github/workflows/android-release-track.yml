@@ -1,0 +1,103 @@
+name: 🚀 Release Track (Alpha/Beta/Production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Play Store track"
+        required: true
+        default: "alpha"
+        type: choice
+        options:
+          - alpha
+          - beta
+          - production
+      version_name:
+        description: "Version name (e.g., 0.1.0)"
+        required: false
+      version_code:
+        description: "Version code (integer)"
+        required: false
+
+concurrency:
+  group: android-release-${{ github.ref }}-${{ inputs.track }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-aab:
+    name: Build Release AAB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: 🧰 Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.7"
+
+      # Optional: override versionName/versionCode at build time
+      # This avoids editing files from a mobile device.
+      - name: 🏷 Prepare version overrides (optional)
+        id: ver
+        run: |
+          TRACK="${{ inputs.track }}"
+          VN="${{ inputs.version_name }}"
+          VC="${{ inputs.version_code }}"
+
+          echo "track=$TRACK" >> $GITHUB_OUTPUT
+          echo "versionName=$VN" >> $GITHUB_OUTPUT
+          echo "versionCode=$VC" >> $GITHUB_OUTPUT
+
+      - name: 🏗 Build Release AAB
+        env:
+          WK_TRACK: ${{ steps.ver.outputs.track }}
+          WK_VERSION_NAME: ${{ steps.ver.outputs.versionName }}
+          WK_VERSION_CODE: ${{ steps.ver.outputs.versionCode }}
+        run: |
+          echo "Track: $WK_TRACK"
+          echo "VersionName override: $WK_VERSION_NAME"
+          echo "VersionCode override: $WK_VERSION_CODE"
+
+          # If you later add version overrides into Gradle via -P,
+          # we can wire them here. For now, build with repo versions.
+          gradle :app:bundleRelease
+
+      - name: 📎 Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebKurierPhone-Android-release-aab-${{ inputs.track }}
+          path: app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      - name: 📝 Release notes stub
+        run: |
+          echo "Track: ${{ inputs.track }}" > release-notes.txt
+          echo "Commit: ${{ github.sha }}" >> release-notes.txt
+          echo "This workflow currently builds AAB and uploads as artifact." >> release-notes.txt
+          echo "Play Store upload can be enabled after adding service account secrets." >> release-notes.txt
+
+      - name: 📎 Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebKurierPhone-Android-release-notes-${{ inputs.track }}
+          path: release-notes.txt
+          if-no-files-found: error
+
+  # Play Console upload is intentionally NOT enabled by default.
+  # Reason: requires secrets and Play Console setup.
+  # When you're ready, we add:
+  # - GOOGLE_PLAY_SERVICE_ACCOUNT_JSON (secret)
+  # - packageName
+  # - and use a Play Publisher action.
