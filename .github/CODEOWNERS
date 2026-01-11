@@ -1,0 +1,9 @@
+# WebKurierPhone-Android — CODEOWNERS
+# Default owner for everything in this repository
+
+* @VladoExport
+
+# Optional: explicit ownership by areas (can be extended later)
+# /app/ @VladoExport
+# /docs/ @VladoExport
+# /config/ @VladoExport
