@@ -13,13 +13,14 @@
     <!-- Notifications (calls, mission prompts, alerts) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Optional: keep CPU running during calls (can be refined later) -->
+    <!-- Keep CPU running during calls -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="false"
         android:label="WebKurierPhone"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name="com.webkurier.android.MainActivity"
