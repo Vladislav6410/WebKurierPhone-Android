@@ -1,6 +1,21 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+fun loadSigningProps(projectRoot: File): Properties? {
+    val propPath = (project.findProperty("signingPropertiesFile") as String?)?.trim()
+    if (propPath.isNullOrBlank()) return null
+
+    val f = File(projectRoot, propPath)
+    if (!f.exists()) return null
+
+    return Properties().apply {
+        FileInputStream(f).use { fis -> load(fis) }
+    }
 }
 
 android {
@@ -17,6 +32,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val signingProps = loadSigningProps(rootProject.projectDir)
+
+    signingConfigs {
+        // If signingPropertiesFile is provided, we configure release signing dynamically.
+        if (signingProps != null) {
+            create("release") {
+                val storeFileName = signingProps.getProperty("storeFile") ?: "release-keystore.jks"
+                storeFile = file(storeFileName)
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -24,6 +54,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            // Apply release signing only when signing props exist
+            if (signingProps != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isMinifyEnabled = false
@@ -69,10 +104,9 @@ dependencies {
     // --- Security Crypto (EncryptedSharedPreferences) ---
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // --- JSON parsing (we use org.json, already available on Android) ---
-
     // --- Tests ---
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }
+
