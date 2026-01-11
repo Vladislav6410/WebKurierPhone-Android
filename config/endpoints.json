@@ -1,0 +1,47 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-01-11",
+
+  "environment": "development",
+
+  "core": {
+    "restBaseUrl": "https://core.webkurier.dev/api",
+    "websocketUrl": "wss://core.webkurier.dev/ws"
+  },
+
+  "phoneCore": {
+    "restBaseUrl": "https://phonecore.webkurier.dev/api",
+    "websocketUrl": "wss://phonecore.webkurier.dev/ws"
+  },
+
+  "webrtc": {
+    "signalingUrl": "wss://phonecore.webkurier.dev/webrtc",
+    "iceServers": [
+      {
+        "urls": ["stun:stun.l.google.com:19302"]
+      }
+    ]
+  },
+
+  "chain": {
+    "proxyVia": "core",
+    "enabled": true
+  },
+
+  "vehicleHub": {
+    "proxyVia": "core",
+    "enabled": true
+  },
+
+  "security": {
+    "proxyVia": "core",
+    "urlScanRequired": true,
+    "fileScanRequired": true
+  },
+
+  "timeouts": {
+    "restMs": 15000,
+    "websocketMs": 30000,
+    "webrtcSetupMs": 20000
+  }
+}
