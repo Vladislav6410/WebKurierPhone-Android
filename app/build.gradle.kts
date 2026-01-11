@@ -18,6 +18,18 @@ fun loadSigningProps(projectRoot: File): Properties? {
     }
 }
 
+fun ciVersionCodeOrNull(): Int? {
+    val raw = (project.findProperty("ciVersionCode") as String?)?.trim()
+    if (raw.isNullOrBlank()) return null
+    return raw.toIntOrNull()
+}
+
+fun ciVersionNameOrNull(): String? {
+    val raw = (project.findProperty("ciVersionName") as String?)?.trim()
+    if (raw.isNullOrBlank()) return null
+    return raw
+}
+
 android {
     namespace = "com.webkurier.android"
     compileSdk = 34
@@ -26,8 +38,12 @@ android {
         applicationId = "com.webkurier.android"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+
+        val baseVersionCode = 1
+        val baseVersionName = "0.1.0"
+
+        versionCode = ciVersionCodeOrNull() ?: baseVersionCode
+        versionName = ciVersionNameOrNull() ?: baseVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -35,7 +51,6 @@ android {
     val signingProps = loadSigningProps(rootProject.projectDir)
 
     signingConfigs {
-        // If signingPropertiesFile is provided, we configure release signing dynamically.
         if (signingProps != null) {
             create("release") {
                 val storeFileName = signingProps.getProperty("storeFile") ?: "release-keystore.jks"
@@ -55,7 +70,6 @@ android {
                 "proguard-rules.pro"
             )
 
-            // Apply release signing only when signing props exist
             if (signingProps != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -87,7 +101,6 @@ android {
 }
 
 dependencies {
-    // --- AndroidX / Compose ---
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.compose.ui:ui:1.7.2")
@@ -95,16 +108,10 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.3.0")
     debugImplementation("androidx.compose.ui:ui-tooling:1.7.2")
 
-    // --- Coroutines ---
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-
-    // --- Networking (OkHttp) ---
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-
-    // --- Security Crypto (EncryptedSharedPreferences) ---
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // --- Tests ---
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
