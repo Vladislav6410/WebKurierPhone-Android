@@ -1,5 +1,9 @@
 # WebKurierPhone-Android — Native Android Client for the WebKurier Ecosystem
 
+The current Android entry experience is **WebKurier Copilot MVP v0.1 — Pilot / Week 1**.
+See [pilot scope, integration prerequisites and verification](docs/COPILOT_MVP_V01.md).
+The ecosystem overview below describes the preserved legacy/future capabilities.
+
 **WebKurierPhone-Android** is the official native Android application of the WebKurier AI ecosystem.  
 It provides a fast, stable, multilingual mobile client tightly integrated with WebKurierPhoneCore, WebKurierCore, and domain agents across all communication, translation, voice, geodesy previews, WebCoin wallet, and DreamMaker features.
 

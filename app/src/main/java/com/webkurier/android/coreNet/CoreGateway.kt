@@ -3,7 +3,9 @@ package com.webkurier.android.coreNet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.util.concurrent.TimeUnit
 
@@ -44,10 +46,7 @@ class CoreGateway(
     suspend fun post(path: String, jsonBody: String): Result<String> {
         return withContext(Dispatchers.IO) {
             try {
-                val body = okhttp3.RequestBody.create(
-                    okhttp3.MediaType.parse("application/json"),
-                    jsonBody
-                )
+                val body = jsonBody.toRequestBody("application/json".toMediaType())
 
                 val request = buildRequest(path)
                     .newBuilder()
@@ -75,10 +74,10 @@ class CoreGateway(
 
     private fun handleResponse(response: Response): Result<String> {
         return if (response.isSuccessful) {
-            Result.success(response.body()?.string().orEmpty())
+            Result.success(response.body?.string().orEmpty())
         } else {
             Result.failure(
-                RuntimeException("Core error ${response.code()} : ${response.message()}")
+                RuntimeException("Core error ${response.code} : ${response.message}")
             )
         }
     }

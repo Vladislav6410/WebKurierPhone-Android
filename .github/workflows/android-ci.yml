@@ -17,6 +17,7 @@ jobs:
   build:
     name: Build + Lint + Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: 📦 Checkout
@@ -29,9 +30,7 @@ jobs:
           java-version: "17"
           cache: "gradle"
 
-      # We intentionally avoid relying on gradle-wrapper.jar here,
-      # because the repository is being assembled from a mobile device (iPhone).
-      # This installs Gradle and runs tasks directly.
+      # Official Gradle 8.7 wrapper with a pinned distribution checksum.
       - name: 🧰 Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -39,19 +38,32 @@ jobs:
 
       - name: 🧪 Verify Gradle
         run: |
-          gradle --version
+          ./gradlew --version
 
       - name: 🧹 Lint (Android)
         run: |
-          gradle :app:lintDebug
+          ./gradlew :app:lintDebug
 
       - name: ✅ Unit tests
         run: |
-          gradle :app:testDebugUnitTest
+          ./gradlew :app:testDebugUnitTest
 
       - name: 🏗 Build Debug APK
         run: |
-          gradle :app:assembleDebug
+          ./gradlew :app:assembleDebug
+
+      - name: Check all variants
+        run: ./gradlew :app:check
+
+      - name: Upload test and lint evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-and-lint-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: warn
 
       - name: 📎 Upload APK artifact
         uses: actions/upload-artifact@v4
