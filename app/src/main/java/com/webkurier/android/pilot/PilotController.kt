@@ -13,6 +13,8 @@ class PilotController(
     private val github: GitHubAuthService,
     private val copilot: CopilotService
 ) {
+    val isGitHubConfigured = github.isConfigured
+    val isCopilotConfigured = copilot.isConfigured
     private val mutableProgress = MutableStateFlow(progressStore.load())
     val progress = mutableProgress.asStateFlow()
     private val mutableConnection = MutableStateFlow(GitHubConnection())

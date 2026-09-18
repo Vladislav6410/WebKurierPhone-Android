@@ -30,6 +30,14 @@ data class CourseProgress(val currentDay: Int = 1, val completedDays: Set<Int> =
     fun completeCurrent(): CourseProgress = copy(completedDays = completedDays + currentDay)
 }
 
+/** Tolerate missing, old or incorrectly typed device preferences without trusting them. */
+fun restoreCourseProgress(currentDay: Any?, completedDays: Any?): CourseProgress = CourseProgress(
+    currentDay = (currentDay as? Int)?.takeIf { it in PilotCourse.days } ?: 1,
+    completedDays = (completedDays as? Set<*>).orEmpty()
+        .mapNotNull { (it as? String)?.toIntOrNull() }
+        .filter { it in PilotCourse.days }.toSet()
+)
+
 data class StudentProject(val repository: String, val description: String? = null)
 data class GitHubIdentity(val login: String, val project: StudentProject? = null)
 
@@ -59,12 +67,13 @@ fun validateWebsiteUrl(raw: String?): WebsiteResult {
     if (raw.isNullOrBlank()) return WebsiteResult.NotConfigured
     return try {
         val uri = URI(raw.trim())
+        val host = uri.host?.trimEnd('.').orEmpty()
         if (!uri.scheme.equals("https", ignoreCase = true) || uri.host.isNullOrBlank() ||
-            !uri.host.contains('.') || uri.host.contains(':') || uri.rawUserInfo != null || uri.rawQuery != null ||
+            !host.contains('.') || host.contains(':') || uri.rawUserInfo != null || uri.rawQuery != null ||
             uri.rawFragment != null || uri.port !in listOf(-1, 443) ||
-            uri.host.endsWith(".localhost", ignoreCase = true) ||
-            uri.host.all { it.isDigit() || it == '.' }
-        ) WebsiteResult.Invalid else WebsiteResult.Ready(uri.toASCIIString())
+            host.endsWith(".localhost", ignoreCase = true) ||
+            host.split('.').all { it.matches(Regex("(?i)(0x[0-9a-f]+|[0-9]+)")) }
+        ) WebsiteResult.Invalid else WebsiteResult.Ready(uri.toASCIIString().replaceRange(0, uri.scheme.length, "https"))
     } catch (_: Exception) {
         WebsiteResult.Invalid
     }

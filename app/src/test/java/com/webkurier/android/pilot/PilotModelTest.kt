@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PilotModelTest {
+    @Test fun restorationFiltersMalformedAndOutOfRangePreferences() {
+        assertEquals(CourseProgress(), restoreCourseProgress("2", "3"))
+        assertEquals(CourseProgress(), restoreCourseProgress(null, null))
+        assertEquals(CourseProgress(1, setOf(2)), restoreCourseProgress(8, setOf("2", "8", "bad", 3)))
+        assertEquals(CourseProgress(3, setOf(1, 3)), restoreCourseProgress(3, setOf("1", "3")))
+    }
     @Test fun weekOneHasExactlyThreeAccessibleDays() {
         assertEquals(listOf(1, 2, 3), PilotCourse.days)
         assertEquals(PilotWeek(1, CourseState.AVAILABLE), PilotCourse.weeks.first())
@@ -45,6 +51,7 @@ class PilotModelTest {
         val result = validateWebsiteUrl(" https://student.example.org/lesson/index.html ")
         assertEquals("https://student.example.org/lesson/index.html", (result as WebsiteResult.Ready).url)
         assertTrue(validateWebsiteUrl("https://student.example.org:443/") is WebsiteResult.Ready)
+        assertEquals("https://student.example.org/", (validateWebsiteUrl("HTTPS://student.example.org/") as WebsiteResult.Ready).url)
     }
 
     @Test fun unsafeOrMalformedWebsiteIsRejected() {
@@ -54,6 +61,9 @@ class PilotModelTest {
             "https://", "https://user:password@student.example.org", "https://student.example.org:8080",
             "https://student.example.org/?token=example", "https://student.example.org/#example",
             "https://localhost/", "https://site.localhost/", "https://127.0.0.1/",
+            "https://localhost./", "https://site.LOCALHOST./", "https://127.0.0.1./",
+            "https://0x7f.1/", "https://0177.0.0.1/",
+            "https://student.example.org/%", "https://student.example.org/?", "https://student.example.org/#",
             "https://[::1]/", "https://[::ffff:127.0.0.1]/",
             "https://student.example.org/a b", "https://student.example.org\\@other.example.org"
         ).forEach { assertEquals(it, WebsiteResult.Invalid, validateWebsiteUrl(it)) }

@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             WebKurierTheme {
                 val dependencies = remember { PilotDependencies(applicationContext) }
-                PilotApp(dependencies)
+                PilotApp(dependencies.controller, dependencies.website)
             }
         }
     }

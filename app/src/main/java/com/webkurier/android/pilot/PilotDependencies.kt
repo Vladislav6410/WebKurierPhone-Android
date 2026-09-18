@@ -12,14 +12,13 @@ class PilotDependencies(context: Context) {
     )
 }
 
-private class LocalCourseProgressStore(context: Context) : CourseProgressStore {
+internal class LocalCourseProgressStore(context: Context) : CourseProgressStore {
     private val preferences = context.getSharedPreferences("pilot_course_progress", Context.MODE_PRIVATE)
 
-    override fun load(): CourseProgress = CourseProgress(
-        currentDay = preferences.getInt("current_day", 1).takeIf { it in PilotCourse.days } ?: 1,
-        completedDays = preferences.getStringSet("completed_days", emptySet()).orEmpty()
-            .mapNotNull { it.toIntOrNull() }.filter { it in PilotCourse.days }.toSet()
-    )
+    override fun load(): CourseProgress {
+        val stored = preferences.all
+        return restoreCourseProgress(stored["current_day"], stored["completed_days"])
+    }
 
     override fun save(progress: CourseProgress) {
         preferences.edit().putInt("current_day", progress.currentDay)

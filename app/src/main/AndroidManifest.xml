@@ -9,6 +9,8 @@
 
     <!-- Camera for OCR / document translation -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Legacy OCR can use a camera; the student pilot does not require one. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- Notifications (calls, mission prompts, alerts) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

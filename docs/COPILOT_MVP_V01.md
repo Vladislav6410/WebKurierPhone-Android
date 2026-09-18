@@ -22,16 +22,17 @@ other unfinished lessons are AVAILABLE. «Я выполнил(а) задание
 self-reported COMPLETED mark. It never claims that GitHub or the website changed.
 Progress is stored on this device in dedicated SharedPreferences through
 CourseProgressStore. It survives app recreation, is not synced, and is not server
-authority. Authentication and conversation state are not persisted. Drafts are
+authority. Restoration filters invalid lesson values and incorrectly typed stored
+preferences rather than crashing. Authentication and conversation state are not persisted. Drafts are
 in memory per lesson and clear on lesson change or activity recreation.
 
 ## Architecture and localization
 
 MainActivity now creates PilotDependencies and the Compose PilotApp. The existing
 explicit dependency-construction and lightweight navigation approach is retained;
-there is no new framework or runtime dependency. Controller StateFlows drive UI;
+there is no new production framework or runtime dependency. Test-only Robolectric and Compose test libraries exercise Android behavior on the JVM. Controller StateFlows drive UI;
 composition-owned coroutines cancel on disposal and reset pending states. The
-selected destination is saveable; system Back returns to the course.
+selected destination is saveable; system Back returns to the course. Switching sections starts at the top rather than reusing another section's scroll position. Navigation exposes tab selection semantics, and status changes use polite accessibility announcements.
 
 Legacy screens, networking, secure storage, resources and models remain in place.
 The pilot does not instantiate or call the legacy placeholder APIs. Small build
@@ -66,7 +67,7 @@ of those external prerequisites is invented or implemented here.
 
 CopilotService accepts the lesson, instruction and verified project context at a
 client boundary. UnconfiguredCopilot always returns Unavailable without network
-traffic. Send leaves the draft intact and explicitly says it was not sent. No canned
+traffic. Send is disabled while the shipped backend is unconfigured, with the prerequisite explanation beside the editable draft. A service-level Unavailable result also leaves the draft intact and explicitly says it was not sent. No canned
 assistant answer, repository edit or deployment is presented as real. Exceptions
 map to localized errors instead of exposing diagnostics. Input is capped at 2,000
 characters; duplicate pending requests and lesson switches during sending are blocked.
@@ -124,11 +125,44 @@ Local commands attempted on 2026-09-17:
 | `.\gradlew.bat :app:lintDebug` | Exit 1: JAVA_HOME unset; java not found |
 | `.\gradlew.bat :app:assembleDebug` | Exit 1: JAVA_HOME unset; java not found |
 
-These are blocked attempts, not passing Android checks. No JDK/SDK, emulator or
-device was available locally. The existing wrapper JAR is actually a text ProGuard
-file (611 bytes), so installing Java alone does not repair the local wrapper.
-Existing CI installs Gradle 8.7 independently of the wrapper. Consult the PR for
-the exact final commit and CI results; none is implied by this document.
+These were blocked attempts, not passing Android checks. On 2026-09-18 the
+hardening pass verified the same baseline and restored the wrapper with official
+Gradle 8.7; see `gradle/wrapper/README.md` for its exact command and SHA-256 evidence.
+Temurin JDK 17 and Android SDK 34 were installed in ignored local cache directories.
+The wrapper generation task completed successfully. Command-line tools 13.0 installed
+SDK 34 successfully after the current SDK CLI failed to parse legacy package names.
+
+Draft PR #2 was created. Initial Android CI run 35304928928 on the foundation commit
+compiled `:app:compileDebugKotlin` successfully but `gradle :app:lintDebug` failed
+with `PermissionImpliesUnsupportedChromeOsHardware`: the legacy CAMERA permission
+had no optional camera feature declaration. The fix declares that hardware optional;
+it adds no permission and suppresses no lint rule. Unit tests and assembleDebug were
+skipped in that initial run, so they were not passes.
+
+The repaired `.github/workflows/android-ci.yml` invokes `./gradlew --version`,
+`./gradlew :app:lintDebug`, `./gradlew :app:testDebugUnitTest`,
+`./gradlew :app:assembleDebug` and `./gradlew :app:check` on JDK 17. Test/lint reports
+are uploaded even on failure. Security and Play release workflows are unchanged.
+The local hardening verification used these process-only environment settings:
+`JAVA_HOME=.cache/toolchain/jdk/jdk-17.0.20.1+1`, `ANDROID_HOME=.cache/android-sdk`,
+and `GRADLE_USER_HOME=.cache/gradle-home` (all resolved to absolute paths).
+
+| Command executed on 2026-09-18 | Result |
+| --- | --- |
+| `.\gradlew.bat :app:tasks --all --console=plain` | Exit 0, BUILD SUCCESSFUL in 2m 3s |
+| `.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:check :app:assembleDebug --continue --console=plain` | Exit 0, BUILD SUCCESSFUL in 3m 44s; 81 tasks executed |
+
+The combined invocation compiled debug and release Kotlin, executed **29 tests in
+each variant** (58 executions; zero failures/errors/skips), completed lint and check,
+and assembled `app/build/outputs/apk/debug/app-debug.apk` (27,995,277 bytes).
+`--continue` collected independent task outcomes; it did not suppress any failure.
+Lint reported **0 errors and 12 warnings**: dependency-update notices, the existing
+backup-configuration notice and missing launcher icon. Those were not suppressed
+or used to justify unrelated upgrades. Legacy PhoneCoreAPI retains its deprecation
+warning. No runtime source was excluded from compilation.
+
+Final GitHub CI verification is still in progress; consult Draft PR #2 for the
+exact tested head. Local success alone is not a READY verdict.
 
 Added JUnit tests cover Week 1, locked roadmap, selection/completion/restoration,
 URL validation, connection transitions/retry/cancellation, identity invariants,
@@ -136,9 +170,14 @@ request context, pending-request guards, unavailable/error states and cancellati
 Resource XML parsing and diff whitespace checks are performed separately; they
 do not establish Android compilation or runtime correctness.
 
-Not exercised locally: real GitHub login, AI replies, actual repository changes,
-deployment, browser intents, TalkBack, rotation/process death, small-screen layout,
-or device smoke tests. Real integration cannot work until the listed prerequisites
+Robolectric tests exercise actual Compose navigation/back, disabled integration
+actions, a draft, a 320dp-wide screen at 1.5x font scale, Android preference
+restoration and browser intent success/missing-handler/security-error paths.
+They are JVM smoke tests, not emulator/device or screenshot tests.
+
+Not exercised: real GitHub login, AI replies, actual repository changes,
+deployment, a real browser, TalkBack, OS process death, physical keyboard/IME
+behavior or device smoke tests. Real integration cannot work until the listed prerequisites
 are supplied. No signed release or Play upload is part of this task.
 
 ## Out of scope

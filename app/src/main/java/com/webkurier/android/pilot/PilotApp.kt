@@ -1,24 +1,29 @@
 package com.webkurier.android.pilot
 
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,37 +38,51 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.webkurier.android.R
 import kotlinx.coroutines.launch
 
 @Composable
-fun PilotApp(dependencies: PilotDependencies) {
-    val controller = dependencies.controller
+fun PilotApp(controller: PilotController, website: WebsiteResult) {
     val progress by controller.progress.collectAsState()
     val connection by controller.connection.collectAsState()
     val conversation by controller.conversation.collectAsState()
     var route by rememberSaveable { mutableStateOf(PilotRoute.COURSE) }
+    val listState = remember(route) { LazyListState() }
     // Drafts stay in memory only and are scoped to the lesson.
     var draft by remember(progress.currentDay) { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     BackHandler(route != PilotRoute.COURSE) { route = PilotRoute.COURSE }
 
     Scaffold(
+        modifier = Modifier.imePadding(),
         bottomBar = {
             NavigationBar {
-                PilotRoute.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = route == destination,
-                        onClick = { route = destination },
-                        icon = { Text(stringResource(routeLabel(destination))) }
-                    )
+                Row(Modifier.fillMaxWidth().selectableGroup()) {
+                    PilotRoute.entries.forEach { destination ->
+                        Text(
+                            text = stringResource(routeLabel(destination)),
+                            textAlign = TextAlign.Center,
+                            color = if (route == destination) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.weight(1f).heightIn(min = 64.dp)
+                                .selectable(selected = route == destination, role = Role.Tab, onClick = { route = destination })
+                                .padding(horizontal = 8.dp, vertical = 16.dp)
+                        )
+                    }
                 }
             }
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).imePadding(),
+            state = listState,
+            modifier = Modifier.fillMaxSize().padding(padding).testTag("pilot_content"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -78,7 +97,7 @@ fun PilotApp(dependencies: PilotDependencies) {
                         Text(stringResource(R.string.pilot_welcome), style = MaterialTheme.typography.titleLarge)
                         Text(stringResource(R.string.pilot_journey))
                     }
-                    item { ConnectionCard(connection) { scope.launch { controller.connect() } } }
+                    item { ConnectionCard(connection, controller.isGitHubConfigured) { scope.launch { controller.connect() } } }
                     item {
                         Text(stringResource(R.string.pilot_week_one), style = MaterialTheme.typography.titleLarge)
                         Text(stringResource(R.string.pilot_available))
@@ -95,7 +114,7 @@ fun PilotApp(dependencies: PilotDependencies) {
                             ) { Text(stringResource(R.string.pilot_continue)) }
                         }
                     }
-                    item { WebsiteAction(dependencies.website) }
+                    item { WebsiteAction(website) }
                     item { Text(stringResource(R.string.pilot_roadmap), style = MaterialTheme.typography.titleLarge) }
                     items(PilotCourse.weeks.drop(1)) { week ->
                         PilotCard {
@@ -113,7 +132,6 @@ fun PilotApp(dependencies: PilotDependencies) {
                     item { ProjectContext(connection) }
                     item {
                         PilotCard {
-                            Text(stringResource(R.string.pilot_ai_unavailable))
                             Text(stringResource(R.string.pilot_conversation), style = MaterialTheme.typography.titleMedium)
                             Text(conversation.reply ?: stringResource(when (conversation.status) {
                                 MessageStatus.EMPTY -> R.string.pilot_empty_conversation
@@ -121,10 +139,11 @@ fun PilotApp(dependencies: PilotDependencies) {
                                 MessageStatus.UNAVAILABLE -> R.string.pilot_not_sent
                                 MessageStatus.ERROR -> R.string.pilot_message_error
                                 MessageStatus.RECEIVED -> R.string.pilot_empty_conversation
-                            }))
+                            }), modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                         }
                     }
                     item {
+                        if (!controller.isCopilotConfigured) Text(stringResource(R.string.pilot_ai_unavailable))
                         OutlinedTextField(
                             value = draft,
                             onValueChange = { if (it.length <= PilotController.MAX_MESSAGE_LENGTH) draft = it },
@@ -136,12 +155,12 @@ fun PilotApp(dependencies: PilotDependencies) {
                             modifier = Modifier.fillMaxWidth()
                         )
                         Button(
-                            enabled = draft.isNotBlank() && conversation.status != MessageStatus.SENDING,
+                            enabled = controller.isCopilotConfigured && draft.isNotBlank() && conversation.status != MessageStatus.SENDING,
                             onClick = { scope.launch { controller.send(draft) } },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text(stringResource(R.string.pilot_send)) }
+                        ) { Text(stringResource(if (conversation.status == MessageStatus.SENDING) R.string.pilot_sending else R.string.pilot_send)) }
                     }
-                    item { WebsiteAction(dependencies.website) }
+                    item { WebsiteAction(website) }
                     item {
                         Text(stringResource(R.string.pilot_local_progress))
                         Button(
@@ -151,14 +170,14 @@ fun PilotApp(dependencies: PilotDependencies) {
                     }
                 }
                 PilotRoute.PROJECT -> {
-                    item { ConnectionCard(connection) { scope.launch { controller.connect() } } }
+                    item { ConnectionCard(connection, controller.isGitHubConfigured) { scope.launch { controller.connect() } } }
                     item { ProjectContext(connection) }
                     item {
                         Text(stringResource(dayTitle(progress.currentDay)), style = MaterialTheme.typography.titleMedium)
                         Text(stringResource(dayTask(progress.currentDay)))
                         Button(onClick = { route = PilotRoute.COPILOT }) { Text(stringResource(R.string.pilot_ask)) }
                     }
-                    item { WebsiteAction(dependencies.website) }
+                    item { WebsiteAction(website) }
                 }
             }
         }
@@ -166,16 +185,17 @@ fun PilotApp(dependencies: PilotDependencies) {
 }
 
 @Composable
-private fun ConnectionCard(connection: GitHubConnection, onConnect: () -> Unit) {
+private fun ConnectionCard(connection: GitHubConnection, configured: Boolean, onConnect: () -> Unit) {
     PilotCard {
         Text(stringResource(when (connection.status) {
             ConnectionStatus.NOT_CONNECTED -> R.string.pilot_not_connected
             ConnectionStatus.CONNECTING -> R.string.pilot_connecting
             ConnectionStatus.CONNECTED -> R.string.pilot_connected
             ConnectionStatus.ERROR -> R.string.pilot_connection_error
-        }), style = MaterialTheme.typography.titleMedium)
+        }), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         Text(stringResource(R.string.pilot_github_intro))
         connection.identity?.let { Text(stringResource(R.string.pilot_identity, it.login)) }
+        if (!configured && connection.error == null) Text(stringResource(R.string.pilot_auth_unavailable))
         connection.error?.let {
             Text(stringResource(if (it == ConnectionError.NOT_CONFIGURED) R.string.pilot_auth_unavailable else R.string.pilot_auth_failed))
         }
@@ -209,10 +229,7 @@ private fun WebsiteAction(website: WebsiteResult) {
         enabled = website is WebsiteResult.Ready,
         onClick = {
             if (website is WebsiteResult.Ready) {
-                browserFailed = try {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(website.url)).addCategory(Intent.CATEGORY_BROWSABLE))
-                    false
-                } catch (_: ActivityNotFoundException) { true } catch (_: SecurityException) { true }
+                browserFailed = !openWebsite(context, website)
             }
         },
         modifier = Modifier.fillMaxWidth()
@@ -222,6 +239,14 @@ private fun WebsiteAction(website: WebsiteResult) {
         website == WebsiteResult.NotConfigured -> Text(stringResource(R.string.pilot_site_missing))
         website == WebsiteResult.Invalid -> Text(stringResource(R.string.pilot_site_invalid))
     }
+}
+
+internal fun openWebsite(context: Context, website: WebsiteResult): Boolean {
+    if (website !is WebsiteResult.Ready) return false
+    return try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(website.url)).addCategory(Intent.CATEGORY_BROWSABLE))
+        true
+    } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
 }
 
 @Composable

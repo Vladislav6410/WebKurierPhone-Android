@@ -100,6 +100,14 @@ class PilotControllerTest {
         assertEquals(Conversation(), controller.conversation.value)
     }
 
+    @Test fun exactLengthLimitIsAcceptedAndMissingProjectStaysAbsent() = runBlocking {
+        var sent: CopilotRequest? = null
+        val controller = controller(copilot = CopilotService { sent = it; CopilotReply.Unavailable })
+        controller.send("x".repeat(PilotController.MAX_MESSAGE_LENGTH))
+        assertEquals(PilotController.MAX_MESSAGE_LENGTH, sent?.message?.length)
+        assertNull(sent?.project)
+    }
+
     @Test fun requestUsesSelectedLessonAndVerifiedProjectAndGuardsConcurrentChanges() = runBlocking {
         val response = CompletableDeferred<CopilotReply>()
         val project = StudentProject("class/first-page")
