@@ -23,8 +23,8 @@ self-reported COMPLETED mark. It never claims that GitHub or the website changed
 Progress is stored on this device in dedicated SharedPreferences through
 CourseProgressStore. It survives app recreation, is not synced, and is not server
 authority. Restoration filters invalid lesson values and incorrectly typed stored
-preferences rather than crashing. Authentication and conversation state are not persisted. Drafts are
-in memory per lesson and clear on lesson change or activity recreation.
+preferences rather than crashing. Authentication is not persisted. Phase 3 stores
+separate conversation histories and drafts for days 1, 2 and 3 on this device.
 
 ## Architecture and localization
 
@@ -32,7 +32,7 @@ MainActivity now creates PilotDependencies and the Compose PilotApp. The existin
 explicit dependency-construction and lightweight navigation approach is retained;
 there is no new production framework or runtime dependency. Test-only Robolectric and Compose test libraries exercise Android behavior on the JVM. Controller StateFlows drive UI;
 composition-owned coroutines cancel on disposal and reset pending states. The
-selected destination is saveable; system Back returns to the course. Switching sections starts at the top rather than reusing another section's scroll position. Navigation exposes tab selection semantics, and status changes use polite accessibility announcements.
+selected destination is persisted with a validated course fallback; system Back returns to the course. Switching sections or lessons starts at the top rather than reusing another section's scroll position. Navigation exposes tab selection semantics, and status changes use polite accessibility announcements.
 
 Legacy screens, networking, secure storage, resources and models remain in place.
 The pilot does not instantiate or call the legacy placeholder APIs. Small build
@@ -65,12 +65,102 @@ of those external prerequisites is invented or implemented here.
 
 ## AI backend status
 
-CopilotService accepts the lesson, instruction and verified project context at a
+CopilotService accepts the lesson, instruction, bounded prior conversation and verified project context at a
 client boundary. UnconfiguredCopilot always returns Unavailable without network
 traffic. Send is disabled while the shipped backend is unconfigured, with the prerequisite explanation beside the editable draft. A service-level Unavailable result also leaves the draft intact and explicitly says it was not sent. No canned
 assistant answer, repository edit or deployment is presented as real. Exceptions
 map to localized errors instead of exposing diagnostics. Input is capped at 2,000
 characters; duplicate pending requests and lesson switches during sending are blocked.
+
+## Phase 3 conversation foundation
+
+The clean starting HEAD was `48ec258816866220d5a347058b3c9b8f1df4dd2c` on
+`feat/webkurier-copilot-mvp-v01`. MainActivity still opens PilotApp directly.
+Exactly three main destinations remain: Мой курс, Copilot, Мой проект / GitHub.
+No communication Home, Translator, Voice, Wallet or generic AI navigation is added.
+
+`PilotController` owns immutable conversation snapshots for each Week 1 lesson.
+Entries have a monotonically increasing lesson-local ID and a STUDENT, COPILOT or
+SYSTEM role. The list order is authoritative; wall-clock timestamps are not used.
+Material 3 cards distinguish roles using both localized labels and container colors.
+System messages use localized notice codes and polite live regions. Pending status,
+task, lesson, project context, draft, send and local completion remain on the chat screen.
+
+`ConversationStore` separates state from storage. Production uses versioned JSON in
+private `pilot_conversations` SharedPreferences, alongside existing progress storage.
+Each of days 1–3 has at most **40 entries**, each at most **8,000 UTF-16 characters**,
+and a **2,000-character draft**. Oldest entries are dropped. Stored payloads above
+2,000,000 characters per lesson are rejected before JSON parsing. Invalid versions,
+roles, notice codes, text bounds, duplicate/out-of-order/overflow IDs and malformed
+JSON recover to an empty conversation for that lesson. Invalid routes fall back to course.
+Storage writes use Android SharedPreferences.apply; normal Activity recreation and
+app restart retain state. Abrupt termination before the asynchronous disk flush
+can lose the latest write. There is no cloud sync, history export or deletion UI.
+
+Draft edits persist independently per lesson. Success clears the originating draft;
+unavailable, exception and cancellation outcomes retain it. Pending sends reject
+duplicate submissions, draft edits and lesson switches. Completion is self-reported
+course progress only. Composition cancellation clears pending and records a safe
+system notice; pending work is never restored or automatically resent after restart.
+If a process dies during a request, its saved student entry and draft remain without
+a confirmed answer; the client does not infer remote success.
+
+Requests carry the day, trimmed instruction, verified assigned project if provided
+by GitHubAuthService, and at most **12 prior non-system entries from that lesson**.
+The current instruction is not duplicated in that context. Unavailable/error text
+never becomes a fabricated assistant answer. Empty service replies become safe errors;
+long replies are bounded locally. No HTTP endpoint or provider SDK was added.
+Future real adapters still require Android → WebKurier backend/Core → Training Agent
+→ authorized AI/tools → Android. Server responsibilities remain outside Android.
+
+No credentials, session tokens, GitHub identity or project assignment are serialized
+by the new store. Conversation text is private app data, not encrypted by this store;
+Android backup remains disabled. No dependency, permission or CI policy was changed.
+
+### Phase 3 local verification
+
+Completed on 2026-09-19; final resource-change verification repeated on 2026-09-20.
+Exact successful invocation (PowerShell, existing ignored toolchain helper):
+
+```powershell
+$env:ANDROID_USER_HOME = Join-Path $PWD '.cache/android-user'
+$env:JAVA_TOOL_OPTIONS = '-Duser.home=C:\Users\User'
+.\.cache\run-gradle.ps1 :app:testDebugUnitTest :app:testReleaseUnitTest :app:lintDebug :app:check :app:assembleDebug :app:assembleRelease --continue --no-daemon --console=plain
+```
+
+The helper invokes gradlew.bat using cached JDK 17, Android SDK 34 and Gradle 8.7.
+The first sandboxed attempt was interrupted after Kotlin could not write its daemon
+marker under AppData. The retry outside the sandbox completed BUILD SUCCESSFUL in
+1m 23s, 106 actionable tasks (34 executed, 72 up-to-date). After correcting the draft
+persistence hint, the same command passed again in 1m 16s (28 executed, 78 up-to-date).
+Logs: ignored `.cache/phase3-verification-2.log` and `.cache/phase3-final-verification.log`.
+No passing claim is made for the first attempt.
+
+| Task | Result |
+| --- | --- |
+| `:app:testDebugUnitTest` | PASS: 51 tests, 0 failures/errors/skips |
+| `:app:testReleaseUnitTest` | PASS: 51 tests, 0 failures/errors/skips |
+| `:app:lintDebug` | PASS: 0 errors, 12 warnings |
+| `:app:check` | PASS |
+| `:app:assembleDebug` | PASS: app-debug.apk, 28,101,613 bytes |
+| `:app:assembleRelease` | PASS: app-release-unsigned.apk, 21,299,982 bytes |
+
+Per variant: LocalConversationStoreTest 7, PilotAndroidTest 3, PilotControllerTest 12,
+PilotConversationTest 12, PilotModelTest 11, PilotUiTest 6. This adds 22 tests per
+variant to the 29-test baseline. Tests cover roles/order, all three lesson histories
+and drafts, length limits, cancellation/duplicate sends, bounded request context,
+storage corruption and bounds, route/progress restoration, Activity recreation,
+three tab semantics, Back, unavailable backend and role labels at 320dp/1.5x font.
+Robolectric/Compose tests are JVM smoke tests; no real TalkBack, device, process-kill,
+OAuth, AI/backend, repository mutation or deployment test was performed.
+
+Baseline CI for `48ec258816866220d5a347058b3c9b8f1df4dd2c`: Android run
+35367800360 passed; CodeQL job 105674354287 passed. Dependency Review job
+105674354588 failed with “Dependency review is not supported on this repository”
+and asked to enable Dependency graph. This predates Phase 3. Security settings and
+workflow enforcement remain unchanged. Final pushed-SHA CI is recorded in Draft PR #2.
+
+Earlier verification sections below describe historical foundation/hardening runs only.
 
 The operator must supply a verified WebKurier-controlled backend contract for
 authenticated lesson assistance, project authorization, responses, errors and any

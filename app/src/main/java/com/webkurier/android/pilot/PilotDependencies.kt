@@ -8,7 +8,8 @@ class PilotDependencies(context: Context) {
     private val appContext = context.applicationContext
     val website: WebsiteResult = validateWebsiteUrl(appContext.getString(R.string.pilot_website_url))
     val controller = PilotController(
-        LocalCourseProgressStore(appContext), UnconfiguredGitHubAuth, UnconfiguredCopilot
+        LocalCourseProgressStore(appContext), UnconfiguredGitHubAuth, UnconfiguredCopilot,
+        LocalConversationStore(appContext)
     )
 }
 

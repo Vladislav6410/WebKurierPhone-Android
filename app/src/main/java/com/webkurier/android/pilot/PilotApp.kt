@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.foundation.selection.selectable
@@ -33,7 +34,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -53,12 +53,11 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
     val progress by controller.progress.collectAsState()
     val connection by controller.connection.collectAsState()
     val conversation by controller.conversation.collectAsState()
-    var route by rememberSaveable { mutableStateOf(PilotRoute.COURSE) }
-    val listState = remember(route) { LazyListState() }
-    // Drafts stay in memory only and are scoped to the lesson.
-    var draft by remember(progress.currentDay) { mutableStateOf("") }
+    val route by controller.route.collectAsState()
+    val listState = remember(route, progress.currentDay) { LazyListState() }
+    val draft = conversation.draft
     val scope = rememberCoroutineScope()
-    BackHandler(route != PilotRoute.COURSE) { route = PilotRoute.COURSE }
+    BackHandler(route != PilotRoute.COURSE) { controller.navigate(PilotRoute.COURSE) }
 
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -72,7 +71,7 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                             color = if (route == destination) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.labelLarge,
                             modifier = Modifier.weight(1f).heightIn(min = 64.dp)
-                                .selectable(selected = route == destination, role = Role.Tab, onClick = { route = destination })
+                                .selectable(selected = route == destination, role = Role.Tab, onClick = { controller.navigate(destination) })
                                 .padding(horizontal = 8.dp, vertical = 16.dp)
                         )
                     }
@@ -110,7 +109,7 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                             Text(stringResource(dayGoal(day)))
                             Button(
                                 enabled = conversation.status != MessageStatus.SENDING,
-                                onClick = { controller.selectDay(day); route = PilotRoute.COPILOT }
+                                onClick = { controller.selectDay(day); controller.navigate(PilotRoute.COPILOT) }
                             ) { Text(stringResource(R.string.pilot_continue)) }
                         }
                     }
@@ -131,22 +130,21 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                     }
                     item { ProjectContext(connection) }
                     item {
-                        PilotCard {
-                            Text(stringResource(R.string.pilot_conversation), style = MaterialTheme.typography.titleMedium)
-                            Text(conversation.reply ?: stringResource(when (conversation.status) {
-                                MessageStatus.EMPTY -> R.string.pilot_empty_conversation
-                                MessageStatus.SENDING -> R.string.pilot_sending
-                                MessageStatus.UNAVAILABLE -> R.string.pilot_not_sent
-                                MessageStatus.ERROR -> R.string.pilot_message_error
-                                MessageStatus.RECEIVED -> R.string.pilot_empty_conversation
-                            }), modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                        }
+                        Text(stringResource(R.string.pilot_conversation), style = MaterialTheme.typography.titleMedium)
+                        if (conversation.entries.isEmpty()) Text(stringResource(R.string.pilot_empty_conversation))
+                    }
+                    items(conversation.entries, key = { "message_${progress.currentDay}_${it.id}" }) { entry ->
+                        ConversationMessage(entry)
+                    }
+                    item {
+                        if (conversation.status == MessageStatus.SENDING) Text(stringResource(R.string.pilot_sending),
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     }
                     item {
                         if (!controller.isCopilotConfigured) Text(stringResource(R.string.pilot_ai_unavailable))
                         OutlinedTextField(
                             value = draft,
-                            onValueChange = { if (it.length <= PilotController.MAX_MESSAGE_LENGTH) draft = it },
+                            onValueChange = controller::setDraft,
                             enabled = conversation.status != MessageStatus.SENDING,
                             label = { Text(stringResource(R.string.pilot_message)) },
                             supportingText = { Text(stringResource(R.string.pilot_message_limit)) },
@@ -156,7 +154,7 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                         )
                         Button(
                             enabled = controller.isCopilotConfigured && draft.isNotBlank() && conversation.status != MessageStatus.SENDING,
-                            onClick = { scope.launch { controller.send(draft) } },
+                            onClick = { scope.launch { controller.send() } },
                             modifier = Modifier.fillMaxWidth()
                         ) { Text(stringResource(if (conversation.status == MessageStatus.SENDING) R.string.pilot_sending else R.string.pilot_send)) }
                     }
@@ -165,7 +163,7 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                         Text(stringResource(R.string.pilot_local_progress))
                         Button(
                             enabled = progress.state(progress.currentDay) != CourseState.COMPLETED,
-                            onClick = { controller.completeDay(); route = PilotRoute.COURSE }
+                            onClick = { controller.completeDay(); controller.navigate(PilotRoute.COURSE) }
                         ) { Text(stringResource(R.string.pilot_complete)) }
                     }
                 }
@@ -175,11 +173,36 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                     item {
                         Text(stringResource(dayTitle(progress.currentDay)), style = MaterialTheme.typography.titleMedium)
                         Text(stringResource(dayTask(progress.currentDay)))
-                        Button(onClick = { route = PilotRoute.COPILOT }) { Text(stringResource(R.string.pilot_ask)) }
+                        Button(onClick = { controller.navigate(PilotRoute.COPILOT) }) { Text(stringResource(R.string.pilot_ask)) }
                     }
                     item { WebsiteAction(website) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ConversationMessage(entry: ConversationEntry) {
+    val color = when (entry.role) {
+        MessageRole.STUDENT -> MaterialTheme.colorScheme.primaryContainer
+        MessageRole.COPILOT -> MaterialTheme.colorScheme.secondaryContainer
+        MessageRole.SYSTEM -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    Card(colors = CardDefaults.cardColors(containerColor = color), modifier = Modifier.fillMaxWidth()
+        .testTag("message_${entry.role}_${entry.id}")) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(when (entry.role) {
+                MessageRole.STUDENT -> R.string.pilot_role_student
+                MessageRole.COPILOT -> R.string.pilot_role_copilot
+                MessageRole.SYSTEM -> R.string.pilot_role_system
+            }), style = MaterialTheme.typography.labelLarge)
+            Text(entry.notice?.let { stringResource(when (it) {
+                SystemNotice.UNAVAILABLE -> R.string.pilot_not_sent
+                SystemNotice.ERROR -> R.string.pilot_message_error
+                SystemNotice.CANCELLED -> R.string.pilot_message_cancelled
+            }) } ?: entry.text, modifier = if (entry.role == MessageRole.SYSTEM)
+                Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier)
         }
     }
 }

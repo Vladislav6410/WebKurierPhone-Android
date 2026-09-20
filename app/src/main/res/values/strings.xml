@@ -54,5 +54,9 @@
     <string name="pilot_message_error">Не удалось получить ответ. Текст сохранён в поле; попробуйте ещё раз.</string>
     <string name="pilot_conversation">Разговор по заданию</string>
     <string name="pilot_empty_conversation">Здесь появится ответ Copilot по текущему уроку.</string>
-    <string name="pilot_message_limit">До 2000 символов. Черновик не сохраняется после закрытия приложения.</string>
+    <string name="pilot_message_limit">До 2000 символов. Черновик этого урока сохраняется на устройстве.</string>
+    <string name="pilot_role_student">Вы</string>
+    <string name="pilot_role_copilot">Ответ Copilot</string>
+    <string name="pilot_role_system">Система</string>
+    <string name="pilot_message_cancelled">Ожидание ответа отменено. Черновик сохранён; выполнение запроса не подтверждено.</string>
 </resources>

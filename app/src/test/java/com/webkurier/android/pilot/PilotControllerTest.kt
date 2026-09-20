@@ -87,7 +87,7 @@ class PilotControllerTest {
     @Test fun unconfiguredCopilotNeverPretendsToChangeProject() = runBlocking {
         val controller = controller()
         controller.send("Добавь кнопку")
-        assertEquals(Conversation(MessageStatus.UNAVAILABLE), controller.conversation.value)
+        assertEquals(MessageStatus.UNAVAILABLE, controller.conversation.value.status)
         assertTrue(controller.progress.value.completedDays.isEmpty())
     }
 
@@ -126,7 +126,8 @@ class PilotControllerTest {
         assertEquals(listOf(CopilotRequest(2, "Add text", project)), requests)
         response.complete(CopilotReply.Message("Verified reply"))
         job.join()
-        assertEquals(Conversation(MessageStatus.RECEIVED, "Verified reply"), controller.conversation.value)
+        assertEquals(MessageRole.COPILOT, controller.conversation.value.entries.last().role)
+        assertEquals("Verified reply", controller.conversation.value.entries.last().text)
         controller.selectDay(3)
         assertEquals(Conversation(), controller.conversation.value)
     }
@@ -134,7 +135,7 @@ class PilotControllerTest {
     @Test fun failedCopilotRequestShowsSafeError() = runBlocking {
         val controller = controller(copilot = CopilotService { error("private diagnostic") })
         controller.send("Help")
-        assertEquals(Conversation(MessageStatus.ERROR), controller.conversation.value)
+        assertEquals(SystemNotice.ERROR, controller.conversation.value.entries.last().notice)
     }
 
     @Test fun cancelledCopilotRequestDoesNotStaySending() = runBlocking {
@@ -143,6 +144,7 @@ class PilotControllerTest {
         val job = launch(start = CoroutineStart.UNDISPATCHED) { controller.send("Help") }
         job.cancelAndJoin()
         assertTrue(job.isCancelled)
-        assertEquals(Conversation(), controller.conversation.value)
+        assertEquals(MessageStatus.EMPTY, controller.conversation.value.status)
+        assertEquals(SystemNotice.CANCELLED, controller.conversation.value.entries.last().notice)
     }
 }

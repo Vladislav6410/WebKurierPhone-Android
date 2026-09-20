@@ -16,7 +16,8 @@ object UnconfiguredGitHubAuth : GitHubAuthService {
     override suspend fun connect() = GitHubAuthResult.Unavailable(ConnectionError.NOT_CONFIGURED)
 }
 
-data class CopilotRequest(val day: Int, val message: String, val project: StudentProject?)
+data class CopilotRequest(val day: Int, val message: String, val project: StudentProject?,
+    val history: List<ConversationEntry> = emptyList())
 sealed interface CopilotReply {
     data object Unavailable : CopilotReply
     data class Message(val text: String) : CopilotReply
