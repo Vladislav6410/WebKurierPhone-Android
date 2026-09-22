@@ -290,7 +290,7 @@ internal fun openLessonPdf(context: Context, url: String): Boolean =
         true
     } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
 
-private const val UPDATE_URL = "https://github.com/Vladislav6410/WebKurierPhone-Android/releases"
+private const val UPDATE_URL = "https://github.com/Vladislav6410/WebKurierPhone-Android/releases"\nprivate const val CONTENT_ARCHITECTURE_URL = "https://drive.google.com/file/d/1mSR7njhyl2XJv0yN0-ZjhVHr2RCZZDCw/view?usp=drivesdk"
 
 @Composable
 private fun AppManagementCard() {
@@ -299,6 +299,10 @@ private fun AppManagementCard() {
     PilotCard {
         Text(stringResource(R.string.pilot_app_management), style = MaterialTheme.typography.titleMedium)
         Text(stringResource(R.string.pilot_app_management_note))
+        Button(
+            onClick = { actionFailed = !openContentArchitecture(context) },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.pilot_content_architecture)) }
         Button(
             onClick = { actionFailed = !openUpdateChannel(context) },
             modifier = Modifier.fillMaxWidth()
@@ -310,6 +314,14 @@ private fun AppManagementCard() {
         if (actionFailed) Text(stringResource(R.string.pilot_system_action_failed))
     }
 }
+
+internal fun openContentArchitecture(context: Context): Boolean =
+    try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(CONTENT_ARCHITECTURE_URL)).addCategory(Intent.CATEGORY_BROWSABLE)
+        )
+        true
+    } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
 
 internal fun openUpdateChannel(context: Context): Boolean =
     try {
