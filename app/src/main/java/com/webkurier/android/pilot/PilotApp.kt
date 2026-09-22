@@ -290,7 +290,7 @@ internal fun openLessonPdf(context: Context, url: String): Boolean =
         true
     } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
 
-private const val UPDATE_URL = "https://github.com/Vladislav6410/WebKurierPhone-Android/releases"\nprivate const val CONTENT_ARCHITECTURE_URL = "https://drive.google.com/file/d/1mSR7njhyl2XJv0yN0-ZjhVHr2RCZZDCw/view?usp=drivesdk"
+private const val UPDATE_URL = "https://github.com/Vladislav6410/WebKurierPhone-Android/releases"\nprivate const val CONTENT_ARCHITECTURE_URL = "https://drive.google.com/file/d/1lV669Va0KH5mi-U-HB0AKruKhuftsoCg/view?usp=drivesdk"
 
 @Composable
 private fun AppManagementCard() {
