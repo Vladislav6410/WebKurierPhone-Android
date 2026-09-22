@@ -116,14 +116,19 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                         items(simpleWeekOneLessons) { lesson ->
                             PilotCard {
                                 Text(stringResource(lesson.titleRes), style = MaterialTheme.typography.titleMedium)
-                                Text(stringResource(if (lesson.available) R.string.pilot_available else R.string.pilot_coming_soon))
-                                Button(
-                                    enabled = lesson.available,
-                                    onClick = { if (lesson.available) selectedLesson = lesson },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(stringResource(if (lesson.available) R.string.pilot_open_lesson else R.string.pilot_coming_soon))
+                                Text(stringResource(R.string.pilot_available))
+                                var pdfOpenFailed by remember(lesson.pdfUrl) { mutableStateOf(false) }
+                                if (lesson.assetPath.isNotBlank()) {
+                                    Button(
+                                        onClick = { selectedLesson = lesson },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text(stringResource(R.string.pilot_read_in_app)) }
                                 }
+                                Button(
+                                    onClick = { pdfOpenFailed = !openLessonPdf(context, lesson.pdfUrl) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text(stringResource(R.string.pilot_open_pdf)) }
+                                if (pdfOpenFailed) Text(stringResource(R.string.pilot_browser_missing))
                             }
                         }
                     }
@@ -278,6 +283,12 @@ internal fun openWebsite(context: Context, website: WebsiteResult): Boolean {
     } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
 }
 
+internal fun openLessonPdf(context: Context, url: String): Boolean =
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
+        true
+    } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
+
 @Composable
 private fun PilotCard(content: @Composable ColumnScope.() -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -320,19 +331,51 @@ private fun stateLabel(state: CourseState) = when (state) {
 private data class SimpleLesson(
     val titleRes: Int,
     val assetPath: String,
-    val available: Boolean
+    val pdfUrl: String
 )
 
 private val simpleWeekOneLessons = listOf(
-    SimpleLesson(R.string.pilot_intro_lesson, "education/week01/intro.txt", true),
-    SimpleLesson(R.string.pilot_lesson_one_simple, "education/week01/lesson01.txt", true),
-    SimpleLesson(R.string.pilot_lesson_two_simple, "", false),
-    SimpleLesson(R.string.pilot_lesson_three_simple, "", false),
-    SimpleLesson(R.string.pilot_lesson_four_simple, "", false),
-    SimpleLesson(R.string.pilot_lesson_five_simple, "", false),
-    SimpleLesson(R.string.pilot_lesson_six_simple, "", false)
+    SimpleLesson(
+        R.string.pilot_intro_lesson,
+        "education/week01/intro.txt",
+        "https://drive.google.com/file/d/1ulIXKzbicd67C6tE4JCmvPm3YD_pHmmA/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_one_simple,
+        "education/week01/lesson01.txt",
+        "https://drive.google.com/file/d/1avmoQQ7U6H0rSzY5nwmww0qeT_4xlNQl/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_two_simple,
+        "",
+        "https://drive.google.com/file/d/1wW8gkm0pdsAsu2YkRaf4OciDX-UIT5sA/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_three_simple,
+        "",
+        "https://drive.google.com/file/d/1XNeUyApAymFx3zsH-WKScdwpTbeVM5Na/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_four_simple,
+        "",
+        "https://drive.google.com/file/d/1Pp1KeMZwwFWei2TJyp_6YIRmVI_VLsWz/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_five_simple,
+        "",
+        "https://drive.google.com/file/d/16Z-zfr4m27yFFGgLTu3IZOltGwfcqRoD/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_six_simple,
+        "",
+        "https://drive.google.com/file/d/1m_njgjTjSsuwFJvVrv5Yj-wJ2SsEmNjn/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_seven_simple,
+        "",
+        "https://drive.google.com/file/d/1oJfA4cGtBwEr2HfzSfzkp5sEMWS3WBDZ/view?usp=drivesdk"
+    )
 )
-
 private fun loadLessonText(context: Context, assetPath: String): String =
     runCatching {
         context.assets.open(assetPath).bufferedReader().use { it.readText() }
