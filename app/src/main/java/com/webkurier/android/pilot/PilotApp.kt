@@ -118,6 +118,7 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                                 Text(stringResource(lesson.titleRes), style = MaterialTheme.typography.titleMedium)
                                 Text(stringResource(R.string.pilot_available))
                                 var pdfOpenFailed by remember(lesson.pdfUrl) { mutableStateOf(false) }
+                                var mediaOpenFailed by remember(lesson.audioUrl, lesson.videoUrl) { mutableStateOf(false) }
                                 if (lesson.assetPath.isNotBlank()) {
                                     Button(
                                         onClick = { selectedLesson = lesson },
@@ -129,6 +130,16 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text(stringResource(R.string.pilot_open_pdf)) }
                                 if (pdfOpenFailed) Text(stringResource(R.string.pilot_browser_missing))
+                                listOfNotNull(
+                                    lesson.audioUrl?.let { R.string.pilot_open_audio to it },
+                                    lesson.videoUrl?.let { R.string.pilot_open_video to it }
+                                ).forEach { (label, url) ->
+                                    Button(
+                                        onClick = { mediaOpenFailed = !openLessonMedia(context, url) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text(stringResource(label)) }
+                                }
+                                if (mediaOpenFailed) Text(stringResource(R.string.pilot_browser_missing))
                             }
                         }
                     }
@@ -290,7 +301,16 @@ internal fun openLessonPdf(context: Context, url: String): Boolean =
         true
     } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
 
-private const val UPDATE_URL = "https://github.com/Vladislav6410/WebKurierPhone-Android/releases"\nprivate const val CONTENT_ARCHITECTURE_URL = "https://drive.google.com/file/d/1lV669Va0KH5mi-U-HB0AKruKhuftsoCg/view?usp=drivesdk"
+internal fun isApprovedLessonMediaUrl(url: String): Boolean {
+    val uri = Uri.parse(url)
+    return uri.scheme == "https" && uri.host in setOf("drive.google.com", "www.dropbox.com")
+}
+
+internal fun openLessonMedia(context: Context, url: String): Boolean =
+    if (!isApprovedLessonMediaUrl(url)) false else openLessonPdf(context, url)
+
+private const val UPDATE_URL = "https://github.com/Vladislav6410/WebKurierPhone-Android/releases"
+private const val CONTENT_ARCHITECTURE_URL = "https://drive.google.com/file/d/1lV669Va0KH5mi-U-HB0AKruKhuftsoCg/view?usp=drivesdk"
 
 @Composable
 private fun AppManagementCard() {
@@ -379,7 +399,9 @@ private fun stateLabel(state: CourseState) = when (state) {
 private data class SimpleLesson(
     val titleRes: Int,
     val assetPath: String,
-    val pdfUrl: String
+    val pdfUrl: String,
+    val audioUrl: String? = null,
+    val videoUrl: String? = null
 )
 
 private val simpleWeekOneLessons = listOf(

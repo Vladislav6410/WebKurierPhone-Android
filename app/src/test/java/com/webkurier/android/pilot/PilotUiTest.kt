@@ -42,6 +42,15 @@ class PilotUiTest {
         compose.activityRule.scenario.recreate()
     }
 
+    @Test fun futureMediaButtonsAreHiddenUntilAFileIsConfigured() {
+        compose.onNodeWithText("Слушать MP3").assertDoesNotExist()
+        compose.onNodeWithText("Смотреть видео").assertDoesNotExist()
+        org.junit.Assert.assertTrue(isApprovedLessonMediaUrl("https://drive.google.com/file/d/example/view"))
+        org.junit.Assert.assertTrue(isApprovedLessonMediaUrl("https://www.dropbox.com/s/example/audio.mp3"))
+        org.junit.Assert.assertFalse(isApprovedLessonMediaUrl("https://drive.google.com.attacker.example/file"))
+        org.junit.Assert.assertFalse(isApprovedLessonMediaUrl("javascript:alert(1)"))
+    }
+
     @Test fun exactlyThreeTabsAndCopilotBackReturnsToSelectedCourse() {
         compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).assertCountEquals(3)
         compose.onNodeWithText("Мой курс").assertIsSelected()
