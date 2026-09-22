@@ -54,10 +54,14 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
     val connection by controller.connection.collectAsState()
     val conversation by controller.conversation.collectAsState()
     val route by controller.route.collectAsState()
-    val listState = remember(route, progress.currentDay) { LazyListState() }
+    val context = LocalContext.current
+    var selectedLesson by remember { mutableStateOf<SimpleLesson?>(null) }
+    val listState = remember(route, progress.currentDay, selectedLesson?.assetPath) { LazyListState() }
     val draft = conversation.draft
     val scope = rememberCoroutineScope()
-    BackHandler(route != PilotRoute.COURSE) { controller.navigate(PilotRoute.COURSE) }
+    BackHandler(selectedLesson != null || route != PilotRoute.COURSE) {
+        if (selectedLesson != null) selectedLesson = null else controller.navigate(PilotRoute.COURSE)
+    }
 
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -92,33 +96,51 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
             }
             when (route) {
                 PilotRoute.COURSE -> {
-                    item {
-                        Text(stringResource(R.string.pilot_welcome), style = MaterialTheme.typography.titleLarge)
-                        Text(stringResource(R.string.pilot_journey))
-                    }
-                    item { ConnectionCard(connection, controller.isGitHubConfigured) { scope.launch { controller.connect() } } }
-                    item {
-                        Text(stringResource(R.string.pilot_week_one), style = MaterialTheme.typography.titleLarge)
-                        Text(stringResource(R.string.pilot_available))
-                        Text(stringResource(R.string.pilot_local_progress))
-                    }
-                    items(PilotCourse.days) { day ->
-                        PilotCard {
-                            Text(stringResource(dayTitle(day)), style = MaterialTheme.typography.titleMedium)
-                            Text(stringResource(stateLabel(progress.state(day))))
-                            Text(stringResource(dayGoal(day)))
-                            Button(
-                                enabled = conversation.status != MessageStatus.SENDING,
-                                onClick = { controller.selectDay(day); controller.navigate(PilotRoute.COPILOT) }
-                            ) { Text(stringResource(R.string.pilot_continue)) }
+                    val openedLesson = selectedLesson
+                    if (openedLesson != null) {
+                        item {
+                            Text(stringResource(openedLesson.titleRes), style = MaterialTheme.typography.titleLarge)
+                            Text(loadLessonText(context, openedLesson.assetPath))
                         }
-                    }
-                    item { WebsiteAction(website) }
-                    item { Text(stringResource(R.string.pilot_roadmap), style = MaterialTheme.typography.titleLarge) }
-                    items(PilotCourse.weeks.drop(1)) { week ->
-                        PilotCard {
-                            Text(stringResource(R.string.pilot_week, week.number))
-                            Text(stringResource(R.string.pilot_locked))
+                        item {
+                            Button(
+                                onClick = { selectedLesson = null },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text(stringResource(R.string.pilot_back_to_week)) }
+                        }
+                    } else {
+                        item {
+                            Text(stringResource(R.string.pilot_week_one), style = MaterialTheme.typography.titleLarge)
+                            Text(stringResource(R.string.pilot_week_one_simple_intro))
+                        }
+                        items(simpleWeekOneLessons) { lesson ->
+                            PilotCard {
+                                Text(stringResource(lesson.titleRes), style = MaterialTheme.typography.titleMedium)
+                                Text(stringResource(R.string.pilot_available))
+                                var pdfOpenFailed by remember(lesson.pdfUrl) { mutableStateOf(false) }
+                                var mediaOpenFailed by remember(lesson.audioUrl, lesson.videoUrl) { mutableStateOf(false) }
+                                if (lesson.assetPath.isNotBlank()) {
+                                    Button(
+                                        onClick = { selectedLesson = lesson },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text(stringResource(R.string.pilot_read_in_app)) }
+                                }
+                                Button(
+                                    onClick = { pdfOpenFailed = !openLessonPdf(context, lesson.pdfUrl) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text(stringResource(R.string.pilot_open_pdf)) }
+                                if (pdfOpenFailed) Text(stringResource(R.string.pilot_browser_missing))
+                                listOfNotNull(
+                                    lesson.audioUrl?.let { R.string.pilot_open_audio to it },
+                                    lesson.videoUrl?.let { R.string.pilot_open_video to it }
+                                ).forEach { (label, url) ->
+                                    Button(
+                                        onClick = { mediaOpenFailed = !openLessonMedia(context, url) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text(stringResource(label)) }
+                                }
+                                if (mediaOpenFailed) Text(stringResource(R.string.pilot_browser_missing))
+                            }
                         }
                     }
                 }
@@ -176,6 +198,7 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                         Button(onClick = { controller.navigate(PilotRoute.COPILOT) }) { Text(stringResource(R.string.pilot_ask)) }
                     }
                     item { WebsiteAction(website) }
+                    item { AppManagementCard() }
                 }
             }
         }
@@ -272,6 +295,68 @@ internal fun openWebsite(context: Context, website: WebsiteResult): Boolean {
     } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
 }
 
+internal fun openLessonPdf(context: Context, url: String): Boolean =
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
+        true
+    } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
+
+internal fun isApprovedLessonMediaUrl(url: String): Boolean {
+    val uri = Uri.parse(url)
+    return uri.scheme == "https" && uri.host in setOf("drive.google.com", "www.dropbox.com")
+}
+
+internal fun openLessonMedia(context: Context, url: String): Boolean =
+    if (!isApprovedLessonMediaUrl(url)) false else openLessonPdf(context, url)
+
+private const val UPDATE_URL = "https://github.com/Vladislav6410/WebKurierPhone-Android/releases"
+private const val CONTENT_ARCHITECTURE_URL = "https://drive.google.com/file/d/1lV669Va0KH5mi-U-HB0AKruKhuftsoCg/view?usp=drivesdk"
+
+@Composable
+private fun AppManagementCard() {
+    val context = LocalContext.current
+    var actionFailed by remember { mutableStateOf(false) }
+    PilotCard {
+        Text(stringResource(R.string.pilot_app_management), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.pilot_app_management_note))
+        Button(
+            onClick = { actionFailed = !openContentArchitecture(context) },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.pilot_content_architecture)) }
+        Button(
+            onClick = { actionFailed = !openUpdateChannel(context) },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.pilot_check_update)) }
+        Button(
+            onClick = { actionFailed = !openUninstallConfirmation(context) },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.pilot_uninstall_app)) }
+        if (actionFailed) Text(stringResource(R.string.pilot_system_action_failed))
+    }
+}
+
+internal fun openContentArchitecture(context: Context): Boolean =
+    try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(CONTENT_ARCHITECTURE_URL)).addCategory(Intent.CATEGORY_BROWSABLE)
+        )
+        true
+    } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
+
+internal fun openUpdateChannel(context: Context): Boolean =
+    try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(UPDATE_URL)).addCategory(Intent.CATEGORY_BROWSABLE)
+        )
+        true
+    } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
+
+internal fun openUninstallConfirmation(context: Context): Boolean =
+    try {
+        context.startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${context.packageName}")))
+        true
+    } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
+
 @Composable
 private fun PilotCard(content: @Composable ColumnScope.() -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -309,3 +394,61 @@ private fun stateLabel(state: CourseState) = when (state) {
     CourseState.COMPLETED -> R.string.pilot_completed
     CourseState.LOCKED -> R.string.pilot_locked
 }
+
+
+private data class SimpleLesson(
+    val titleRes: Int,
+    val assetPath: String,
+    val pdfUrl: String,
+    val audioUrl: String? = null,
+    val videoUrl: String? = null
+)
+
+private val simpleWeekOneLessons = listOf(
+    SimpleLesson(
+        R.string.pilot_intro_lesson,
+        "education/week01/intro.txt",
+        "https://drive.google.com/file/d/1ulIXKzbicd67C6tE4JCmvPm3YD_pHmmA/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_one_simple,
+        "education/week01/lesson01.txt",
+        "https://drive.google.com/file/d/1avmoQQ7U6H0rSzY5nwmww0qeT_4xlNQl/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_two_simple,
+        "",
+        "https://drive.google.com/file/d/1wW8gkm0pdsAsu2YkRaf4OciDX-UIT5sA/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_three_simple,
+        "",
+        "https://drive.google.com/file/d/1XNeUyApAymFx3zsH-WKScdwpTbeVM5Na/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_four_simple,
+        "",
+        "https://drive.google.com/file/d/1Pp1KeMZwwFWei2TJyp_6YIRmVI_VLsWz/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_five_simple,
+        "",
+        "https://drive.google.com/file/d/16Z-zfr4m27yFFGgLTu3IZOltGwfcqRoD/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_six_simple,
+        "",
+        "https://drive.google.com/file/d/1m_njgjTjSsuwFJvVrv5Yj-wJ2SsEmNjn/view?usp=drivesdk"
+    ),
+    SimpleLesson(
+        R.string.pilot_lesson_seven_simple,
+        "",
+        "https://drive.google.com/file/d/1oJfA4cGtBwEr2HfzSfzkp5sEMWS3WBDZ/view?usp=drivesdk"
+    )
+)
+private fun loadLessonText(context: Context, assetPath: String): String =
+    runCatching {
+        context.assets.open(assetPath).bufferedReader().use { it.readText() }
+    }.getOrElse {
+        "Материал урока пока недоступен."
+    }

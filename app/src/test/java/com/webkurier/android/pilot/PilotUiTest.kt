@@ -42,6 +42,15 @@ class PilotUiTest {
         compose.activityRule.scenario.recreate()
     }
 
+    @Test fun futureMediaButtonsAreHiddenUntilAFileIsConfigured() {
+        compose.onNodeWithText("Слушать MP3").assertDoesNotExist()
+        compose.onNodeWithText("Смотреть видео").assertDoesNotExist()
+        org.junit.Assert.assertTrue(isApprovedLessonMediaUrl("https://drive.google.com/file/d/example/view"))
+        org.junit.Assert.assertTrue(isApprovedLessonMediaUrl("https://www.dropbox.com/s/example/audio.mp3"))
+        org.junit.Assert.assertFalse(isApprovedLessonMediaUrl("https://drive.google.com.attacker.example/file"))
+        org.junit.Assert.assertFalse(isApprovedLessonMediaUrl("javascript:alert(1)"))
+    }
+
     @Test fun exactlyThreeTabsAndCopilotBackReturnsToSelectedCourse() {
         compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).assertCountEquals(3)
         compose.onNodeWithText("Мой курс").assertIsSelected()
@@ -49,6 +58,23 @@ class PilotUiTest {
         compose.onNodeWithText("День 1 — Моя первая страница").assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithText("Мой курс").assertIsSelected()
+    }
+
+    @Test fun weekOneShowsIntroFiveTheoryAndTwoPracticeLessons() {
+        val labels = listOf(
+            "Ознакомительное занятие",
+            "Урок 1 — Компьютер как система",
+            "Урок 2 — Операционная система, программы, Input и Output",
+            "Урок 3 — Файлы, папки и первый terminal",
+            "Урок 4 — Hardware, интерфейсы и безопасное подключение",
+            "Урок 5 — Инженерный подход к новой задаче",
+            "Урок 6 — Практика: ноутбук и desktop PC изнутри",
+            "Урок 7 — Практика: телемост «Что находится внутри компьютера?»"
+        )
+        labels.forEach { label ->
+            compose.onNodeWithTag("pilot_content").performScrollToNode(hasText(label))
+            compose.onNodeWithText(label).assertExists()
+        }
     }
 
     @Test fun recreationRestoresLessonRouteDraftHistoryAndProgress() {
@@ -101,7 +127,18 @@ class PilotUiTest {
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Посмотреть результат на сайте"))
         compose.onNodeWithText("Посмотреть результат на сайте").assertIsNotEnabled()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        compose.onNodeWithText("Создадим ваш первый сайт").assertExists()
+        compose.onNodeWithText("Неделя 1").assertExists()
+    }
+
+    @Test fun projectShowsSafeUpdateAndUninstallControls() {
+        compose.onNodeWithText("Мой проект / GitHub").performClick()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Проверить обновление"))
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Архитектура контента Phase 1"))
+        compose.onNodeWithText("Архитектура контента Phase 1").assertIsEnabled()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Проверить обновление"))
+        compose.onNodeWithText("Проверить обновление").assertIsEnabled()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Удалить приложение"))
+        compose.onNodeWithText("Удалить приложение").assertIsEnabled()
     }
 
     @Test fun navigationAndResultStayReachableWithLargeFont() {
@@ -117,7 +154,7 @@ class PilotUiTest {
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Посмотреть результат на сайте"))
         compose.onNodeWithText("Посмотреть результат на сайте").assertIsNotEnabled()
         compose.onNodeWithText("Мой курс").performClick()
-        compose.onNodeWithText("Создадим ваш первый сайт").assertExists()
+        compose.onNodeWithText("Неделя 1").assertExists()
     }
 
     @Test fun unavailableCopilotAllowsDraftButDoesNotSend() {
@@ -128,6 +165,6 @@ class PilotUiTest {
         compose.onNodeWithText("Отправить").assertIsNotEnabled()
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Я выполнил(а) задание"))
         compose.onNodeWithText("Я выполнил(а) задание").assertIsEnabled().performClick()
-        compose.onNodeWithText("Создадим ваш первый сайт").assertExists()
+        compose.onNodeWithText("Неделя 1").assertExists()
     }
 }
