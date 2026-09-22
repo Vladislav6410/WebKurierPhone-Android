@@ -57,7 +57,7 @@
     <string name="pilot_context_missing">Контекст проекта: не подключён</string>
     <string name="pilot_view_site">Посмотреть результат на сайте</string>
     <string name="pilot_app_management">Приложение</string>
-    <string name="pilot_app_management_note">Обновление открывает официальный канал WebKurierPhone-Android. Удаление всегда подтверждается штатным окном Android.</string>
+    <string name="pilot_app_management_note">Обновление открывает официальный канал WebKurierPhone-Android. Удаление всегда подтверждается штатным окном Android.</string>\n    <string name="pilot_content_architecture">Архитектура контента Phase 1</string>
     <string name="pilot_check_update">Проверить обновление</string>
     <string name="pilot_uninstall_app">Удалить приложение</string>
     <string name="pilot_system_action_failed">Не удалось открыть системное действие на этом устройстве.</string>
