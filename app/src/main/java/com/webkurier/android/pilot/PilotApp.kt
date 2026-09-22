@@ -187,6 +187,7 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                         Button(onClick = { controller.navigate(PilotRoute.COPILOT) }) { Text(stringResource(R.string.pilot_ask)) }
                     }
                     item { WebsiteAction(website) }
+                    item { AppManagementCard() }
                 }
             }
         }
@@ -286,6 +287,41 @@ internal fun openWebsite(context: Context, website: WebsiteResult): Boolean {
 internal fun openLessonPdf(context: Context, url: String): Boolean =
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
+        true
+    } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
+
+private const val UPDATE_URL = "https://github.com/Vladislav6410/WebKurierPhone-Android/releases"
+
+@Composable
+private fun AppManagementCard() {
+    val context = LocalContext.current
+    var actionFailed by remember { mutableStateOf(false) }
+    PilotCard {
+        Text(stringResource(R.string.pilot_app_management), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.pilot_app_management_note))
+        Button(
+            onClick = { actionFailed = !openUpdateChannel(context) },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.pilot_check_update)) }
+        Button(
+            onClick = { actionFailed = !openUninstallConfirmation(context) },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.pilot_uninstall_app)) }
+        if (actionFailed) Text(stringResource(R.string.pilot_system_action_failed))
+    }
+}
+
+internal fun openUpdateChannel(context: Context): Boolean =
+    try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(UPDATE_URL)).addCategory(Intent.CATEGORY_BROWSABLE)
+        )
+        true
+    } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
+
+internal fun openUninstallConfirmation(context: Context): Boolean =
+    try {
+        context.startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${context.packageName}")))
         true
     } catch (_: ActivityNotFoundException) { false } catch (_: SecurityException) { false }
 
