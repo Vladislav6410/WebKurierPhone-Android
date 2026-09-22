@@ -51,6 +51,23 @@ class PilotUiTest {
         compose.onNodeWithText("Мой курс").assertIsSelected()
     }
 
+    @Test fun weekOneShowsIntroFiveTheoryAndTwoPracticeLessons() {
+        val labels = listOf(
+            "Ознакомительное занятие",
+            "Урок 1 — Компьютер как система",
+            "Урок 2 — Операционная система, программы, Input и Output",
+            "Урок 3 — Файлы, папки и первый terminal",
+            "Урок 4 — Hardware, интерфейсы и безопасное подключение",
+            "Урок 5 — Инженерный подход к новой задаче",
+            "Урок 6 — Практика: ноутбук и desktop PC изнутри",
+            "Урок 7 — Практика: телемост «Что находится внутри компьютера?»"
+        )
+        labels.forEach { label ->
+            compose.onNodeWithTag("pilot_content").performScrollToNode(hasText(label))
+            compose.onNodeWithText(label).assertExists()
+        }
+    }
+
     @Test fun recreationRestoresLessonRouteDraftHistoryAndProgress() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         LocalCourseProgressStore(context).save(CourseProgress(2, setOf(1)))
@@ -101,7 +118,7 @@ class PilotUiTest {
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Посмотреть результат на сайте"))
         compose.onNodeWithText("Посмотреть результат на сайте").assertIsNotEnabled()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        compose.onNodeWithText("Создадим ваш первый сайт").assertExists()
+        compose.onNodeWithText("Неделя 1").assertExists()
     }
 
     @Test fun navigationAndResultStayReachableWithLargeFont() {
@@ -117,7 +134,7 @@ class PilotUiTest {
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Посмотреть результат на сайте"))
         compose.onNodeWithText("Посмотреть результат на сайте").assertIsNotEnabled()
         compose.onNodeWithText("Мой курс").performClick()
-        compose.onNodeWithText("Создадим ваш первый сайт").assertExists()
+        compose.onNodeWithText("Неделя 1").assertExists()
     }
 
     @Test fun unavailableCopilotAllowsDraftButDoesNotSend() {
@@ -128,6 +145,6 @@ class PilotUiTest {
         compose.onNodeWithText("Отправить").assertIsNotEnabled()
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Я выполнил(а) задание"))
         compose.onNodeWithText("Я выполнил(а) задание").assertIsEnabled().performClick()
-        compose.onNodeWithText("Создадим ваш первый сайт").assertExists()
+        compose.onNodeWithText("Неделя 1").assertExists()
     }
 }
