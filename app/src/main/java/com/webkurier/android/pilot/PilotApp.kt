@@ -54,10 +54,14 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
     val connection by controller.connection.collectAsState()
     val conversation by controller.conversation.collectAsState()
     val route by controller.route.collectAsState()
-    val listState = remember(route, progress.currentDay) { LazyListState() }
+    val context = LocalContext.current
+    var selectedLesson by remember { mutableStateOf<SimpleLesson?>(null) }
+    val listState = remember(route, progress.currentDay, selectedLesson?.assetPath) { LazyListState() }
     val draft = conversation.draft
     val scope = rememberCoroutineScope()
-    BackHandler(route != PilotRoute.COURSE) { controller.navigate(PilotRoute.COURSE) }
+    BackHandler(selectedLesson != null || route != PilotRoute.COURSE) {
+        if (selectedLesson != null) selectedLesson = null else controller.navigate(PilotRoute.COURSE)
+    }
 
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -92,33 +96,35 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
             }
             when (route) {
                 PilotRoute.COURSE -> {
-                    item {
-                        Text(stringResource(R.string.pilot_welcome), style = MaterialTheme.typography.titleLarge)
-                        Text(stringResource(R.string.pilot_journey))
-                    }
-                    item { ConnectionCard(connection, controller.isGitHubConfigured) { scope.launch { controller.connect() } } }
-                    item {
-                        Text(stringResource(R.string.pilot_week_one), style = MaterialTheme.typography.titleLarge)
-                        Text(stringResource(R.string.pilot_available))
-                        Text(stringResource(R.string.pilot_local_progress))
-                    }
-                    items(PilotCourse.days) { day ->
-                        PilotCard {
-                            Text(stringResource(dayTitle(day)), style = MaterialTheme.typography.titleMedium)
-                            Text(stringResource(stateLabel(progress.state(day))))
-                            Text(stringResource(dayGoal(day)))
-                            Button(
-                                enabled = conversation.status != MessageStatus.SENDING,
-                                onClick = { controller.selectDay(day); controller.navigate(PilotRoute.COPILOT) }
-                            ) { Text(stringResource(R.string.pilot_continue)) }
+                    val openedLesson = selectedLesson
+                    if (openedLesson != null) {
+                        item {
+                            Text(stringResource(openedLesson.titleRes), style = MaterialTheme.typography.titleLarge)
+                            Text(loadLessonText(context, openedLesson.assetPath))
                         }
-                    }
-                    item { WebsiteAction(website) }
-                    item { Text(stringResource(R.string.pilot_roadmap), style = MaterialTheme.typography.titleLarge) }
-                    items(PilotCourse.weeks.drop(1)) { week ->
-                        PilotCard {
-                            Text(stringResource(R.string.pilot_week, week.number))
-                            Text(stringResource(R.string.pilot_locked))
+                        item {
+                            Button(
+                                onClick = { selectedLesson = null },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text(stringResource(R.string.pilot_back_to_week)) }
+                        }
+                    } else {
+                        item {
+                            Text(stringResource(R.string.pilot_week_one), style = MaterialTheme.typography.titleLarge)
+                            Text(stringResource(R.string.pilot_week_one_simple_intro))
+                        }
+                        items(simpleWeekOneLessons) { lesson ->
+                            PilotCard {
+                                Text(stringResource(lesson.titleRes), style = MaterialTheme.typography.titleMedium)
+                                Text(stringResource(if (lesson.available) R.string.pilot_available else R.string.pilot_coming_soon))
+                                Button(
+                                    enabled = lesson.available,
+                                    onClick = { if (lesson.available) selectedLesson = lesson },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(stringResource(if (lesson.available) R.string.pilot_open_lesson else R.string.pilot_coming_soon))
+                                }
+                            }
                         }
                     }
                 }
@@ -309,3 +315,27 @@ private fun stateLabel(state: CourseState) = when (state) {
     CourseState.COMPLETED -> R.string.pilot_completed
     CourseState.LOCKED -> R.string.pilot_locked
 }
+
+
+private data class SimpleLesson(
+    val titleRes: Int,
+    val assetPath: String,
+    val available: Boolean
+)
+
+private val simpleWeekOneLessons = listOf(
+    SimpleLesson(R.string.pilot_intro_lesson, "education/week01/intro.txt", true),
+    SimpleLesson(R.string.pilot_lesson_one_simple, "education/week01/lesson01.txt", true),
+    SimpleLesson(R.string.pilot_lesson_two_simple, "", false),
+    SimpleLesson(R.string.pilot_lesson_three_simple, "", false),
+    SimpleLesson(R.string.pilot_lesson_four_simple, "", false),
+    SimpleLesson(R.string.pilot_lesson_five_simple, "", false),
+    SimpleLesson(R.string.pilot_lesson_six_simple, "", false)
+)
+
+private fun loadLessonText(context: Context, assetPath: String): String =
+    runCatching {
+        context.assets.open(assetPath).bufferedReader().use { it.readText() }
+    }.getOrElse {
+        "Материал урока пока недоступен."
+    }
