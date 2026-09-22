@@ -124,6 +124,9 @@ class PilotUiTest {
     @Test fun projectShowsSafeUpdateAndUninstallControls() {
         compose.onNodeWithText("Мой проект / GitHub").performClick()
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Проверить обновление"))
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Архитектура контента Phase 1"))
+        compose.onNodeWithText("Архитектура контента Phase 1").assertIsEnabled()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Проверить обновление"))
         compose.onNodeWithText("Проверить обновление").assertIsEnabled()
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Удалить приложение"))
         compose.onNodeWithText("Удалить приложение").assertIsEnabled()
