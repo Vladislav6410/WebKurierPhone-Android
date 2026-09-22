@@ -121,6 +121,14 @@ class PilotUiTest {
         compose.onNodeWithText("Неделя 1").assertExists()
     }
 
+    @Test fun projectShowsSafeUpdateAndUninstallControls() {
+        compose.onNodeWithText("Мой проект / GitHub").performClick()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Проверить обновление"))
+        compose.onNodeWithText("Проверить обновление").assertIsEnabled()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Удалить приложение"))
+        compose.onNodeWithText("Удалить приложение").assertIsEnabled()
+    }
+
     @Test fun navigationAndResultStayReachableWithLargeFont() {
         compose.activityRule.scenario.onActivity { activity ->
             val dependencies = PilotDependencies(activity)
