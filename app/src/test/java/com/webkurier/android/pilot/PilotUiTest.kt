@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -127,6 +128,7 @@ class PilotUiTest {
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Посмотреть результат на сайте"))
         compose.onNodeWithText("Посмотреть результат на сайте").assertIsNotEnabled()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Неделя 1"))
         compose.onNodeWithText("Неделя 1").assertExists()
     }
 
@@ -154,6 +156,7 @@ class PilotUiTest {
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Посмотреть результат на сайте"))
         compose.onNodeWithText("Посмотреть результат на сайте").assertIsNotEnabled()
         compose.onNodeWithText("Мой курс").performClick()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Неделя 1"))
         compose.onNodeWithText("Неделя 1").assertExists()
     }
 
@@ -165,6 +168,50 @@ class PilotUiTest {
         compose.onNodeWithText("Отправить").assertIsNotEnabled()
         compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Я выполнил(а) задание"))
         compose.onNodeWithText("Я выполнил(а) задание").assertIsEnabled().performClick()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Неделя 1"))
         compose.onNodeWithText("Неделя 1").assertExists()
+    }
+
+    @Test fun lessonOneOpensFromCatalogAndBothBackPathsReturnToCatalog() {
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasTestTag("read_lesson_1"))
+        compose.onNodeWithTag("read_lesson_1").performClick()
+        compose.onNodeWithText("Урок 1 — Компьютер как система").assertExists()
+        compose.onNodeWithText("Привет. Это первый урок WebKurier Education.", substring = true).assertExists()
+        compose.onNodeWithText("Неделя 1").assertDoesNotExist()
+
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Неделя 1"))
+        compose.onNodeWithText("Неделя 1").assertExists()
+        compose.onNodeWithText("Мой курс").assertIsSelected()
+
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasTestTag("read_lesson_1"))
+        compose.onNodeWithTag("read_lesson_1").performClick()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Назад к урокам недели"))
+        compose.onNodeWithText("Назад к урокам недели").performClick()
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Урок 1 — Компьютер как система"))
+        compose.onNodeWithText("Урок 1 — Компьютер как система").assertExists()
+        compose.onNodeWithText("Назад к урокам недели").assertDoesNotExist()
+    }
+
+    @Test fun catalogShowsIntroSectionAndSixtyFourNumberedLessons() {
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Вводный раздел"))
+        compose.onNodeWithText("Ознакомительное занятие").assertExists()
+        listOf("Неделя 1", "Уроки 1–8", "Неделя 2", "Уроки 9–16", "Неделя 8", "Уроки 57–64").forEach { label ->
+            compose.onNodeWithTag("pilot_content").performScrollToNode(hasText(label))
+            compose.onNodeWithText(label).assertExists()
+        }
+        listOf(8, 9, 33, 64).forEach { number ->
+            compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Урок $number — в подготовке"))
+            compose.onNodeWithText("Урок $number — в подготовке").assertExists()
+        }
+        compose.onNodeWithText("Урок 7 — в подготовке").assertDoesNotExist()
+    }
+
+    @Test fun lessonInPreparationCannotBeOpened() {
+        compose.onNodeWithTag("pilot_content").performScrollToNode(hasText("Урок 8 — в подготовке"))
+        compose.onNodeWithTag("read_lesson_8").assertDoesNotExist()
+        compose.onNodeWithText("Урок 8 — в подготовке").performClick()
+        compose.onNodeWithText("Урок 8 — в подготовке").assertExists()
+        compose.onNodeWithText("Назад к урокам недели").assertDoesNotExist()
     }
 }
