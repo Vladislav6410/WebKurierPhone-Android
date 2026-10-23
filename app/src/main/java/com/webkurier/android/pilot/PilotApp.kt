@@ -110,36 +110,30 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                         }
                     } else {
                         item {
-                            Text(stringResource(R.string.pilot_week_one), style = MaterialTheme.typography.titleLarge)
+                            Text(stringResource(R.string.pilot_intro_section), style = MaterialTheme.typography.titleLarge)
                             Text(stringResource(R.string.pilot_week_one_simple_intro))
                         }
-                        items(simpleWeekOneLessons) { lesson ->
-                            PilotCard {
-                                Text(stringResource(lesson.titleRes), style = MaterialTheme.typography.titleMedium)
-                                Text(stringResource(R.string.pilot_available))
-                                var pdfOpenFailed by remember(lesson.pdfUrl) { mutableStateOf(false) }
-                                var mediaOpenFailed by remember(lesson.audioUrl, lesson.videoUrl) { mutableStateOf(false) }
-                                if (lesson.assetPath.isNotBlank()) {
-                                    Button(
-                                        onClick = { selectedLesson = lesson },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) { Text(stringResource(R.string.pilot_read_in_app)) }
+                        item(key = "intro") {
+                            ReadyLessonCard(PilotLessonCatalog.intro, readTag = "read_intro") { selectedLesson = it }
+                        }
+                        (1..PilotLessonCatalog.WEEK_COUNT).forEach { week ->
+                            val range = PilotLessonCatalog.lessonsOfWeek(week)
+                            item(key = "week_$week") {
+                                Text(stringResource(R.string.pilot_week, week), style = MaterialTheme.typography.titleLarge)
+                                Text(stringResource(R.string.pilot_week_lessons, range.first, range.last))
+                            }
+                            items(PilotLessonCatalog.lessons.filter { it.week == week }, key = { "lesson_${it.number}" }) { entry ->
+                                when (entry) {
+                                    is CatalogLesson.Ready ->
+                                        ReadyLessonCard(entry.lesson, readTag = "read_lesson_${entry.number}") { selectedLesson = it }
+                                    is CatalogLesson.InPreparation -> PilotCard {
+                                        Text(
+                                            stringResource(R.string.pilot_lesson_in_preparation, entry.number),
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                        Text(stringResource(R.string.pilot_locked))
+                                    }
                                 }
-                                Button(
-                                    onClick = { pdfOpenFailed = !openLessonPdf(context, lesson.pdfUrl) },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) { Text(stringResource(R.string.pilot_open_pdf)) }
-                                if (pdfOpenFailed) Text(stringResource(R.string.pilot_browser_missing))
-                                listOfNotNull(
-                                    lesson.audioUrl?.let { R.string.pilot_open_audio to it },
-                                    lesson.videoUrl?.let { R.string.pilot_open_video to it }
-                                ).forEach { (label, url) ->
-                                    Button(
-                                        onClick = { mediaOpenFailed = !openLessonMedia(context, url) },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) { Text(stringResource(label)) }
-                                }
-                                if (mediaOpenFailed) Text(stringResource(R.string.pilot_browser_missing))
                             }
                         }
                     }
@@ -202,6 +196,38 @@ fun PilotApp(controller: PilotController, website: WebsiteResult) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReadyLessonCard(lesson: SimpleLesson, readTag: String, onRead: (SimpleLesson) -> Unit) {
+    val context = LocalContext.current
+    PilotCard {
+        Text(stringResource(lesson.titleRes), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.pilot_available))
+        var pdfOpenFailed by remember(lesson.pdfUrl) { mutableStateOf(false) }
+        var mediaOpenFailed by remember(lesson.audioUrl, lesson.videoUrl) { mutableStateOf(false) }
+        if (lesson.assetPath.isNotBlank()) {
+            Button(
+                onClick = { onRead(lesson) },
+                modifier = Modifier.fillMaxWidth().testTag(readTag)
+            ) { Text(stringResource(R.string.pilot_read_in_app)) }
+        }
+        Button(
+            onClick = { pdfOpenFailed = !openLessonPdf(context, lesson.pdfUrl) },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.pilot_open_pdf)) }
+        if (pdfOpenFailed) Text(stringResource(R.string.pilot_browser_missing))
+        listOfNotNull(
+            lesson.audioUrl?.let { R.string.pilot_open_audio to it },
+            lesson.videoUrl?.let { R.string.pilot_open_video to it }
+        ).forEach { (label, url) ->
+            Button(
+                onClick = { mediaOpenFailed = !openLessonMedia(context, url) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(stringResource(label)) }
+        }
+        if (mediaOpenFailed) Text(stringResource(R.string.pilot_browser_missing))
     }
 }
 
@@ -396,56 +422,6 @@ private fun stateLabel(state: CourseState) = when (state) {
 }
 
 
-private data class SimpleLesson(
-    val titleRes: Int,
-    val assetPath: String,
-    val pdfUrl: String,
-    val audioUrl: String? = null,
-    val videoUrl: String? = null
-)
-
-private val simpleWeekOneLessons = listOf(
-    SimpleLesson(
-        R.string.pilot_intro_lesson,
-        "education/week01/intro.txt",
-        "https://drive.google.com/file/d/1ulIXKzbicd67C6tE4JCmvPm3YD_pHmmA/view?usp=drivesdk"
-    ),
-    SimpleLesson(
-        R.string.pilot_lesson_one_simple,
-        "education/week01/lesson01.txt",
-        "https://drive.google.com/file/d/1avmoQQ7U6H0rSzY5nwmww0qeT_4xlNQl/view?usp=drivesdk"
-    ),
-    SimpleLesson(
-        R.string.pilot_lesson_two_simple,
-        "",
-        "https://drive.google.com/file/d/1wW8gkm0pdsAsu2YkRaf4OciDX-UIT5sA/view?usp=drivesdk"
-    ),
-    SimpleLesson(
-        R.string.pilot_lesson_three_simple,
-        "",
-        "https://drive.google.com/file/d/1XNeUyApAymFx3zsH-WKScdwpTbeVM5Na/view?usp=drivesdk"
-    ),
-    SimpleLesson(
-        R.string.pilot_lesson_four_simple,
-        "",
-        "https://drive.google.com/file/d/1Pp1KeMZwwFWei2TJyp_6YIRmVI_VLsWz/view?usp=drivesdk"
-    ),
-    SimpleLesson(
-        R.string.pilot_lesson_five_simple,
-        "",
-        "https://drive.google.com/file/d/16Z-zfr4m27yFFGgLTu3IZOltGwfcqRoD/view?usp=drivesdk"
-    ),
-    SimpleLesson(
-        R.string.pilot_lesson_six_simple,
-        "",
-        "https://drive.google.com/file/d/1m_njgjTjSsuwFJvVrv5Yj-wJ2SsEmNjn/view?usp=drivesdk"
-    ),
-    SimpleLesson(
-        R.string.pilot_lesson_seven_simple,
-        "",
-        "https://drive.google.com/file/d/1oJfA4cGtBwEr2HfzSfzkp5sEMWS3WBDZ/view?usp=drivesdk"
-    )
-)
 private fun loadLessonText(context: Context, assetPath: String): String =
     runCatching {
         context.assets.open(assetPath).bufferedReader().use { it.readText() }

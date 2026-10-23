@@ -11,6 +11,9 @@
     <string name="pilot_week_one">Неделя 1</string>
     <string name="pilot_week_one_simple_intro">Стартовый комплект: ознакомительное занятие, 5 теоретических уроков и 2 практических занятия. Для каждого материала доступен PDF.</string>
     <string name="pilot_intro_lesson">Ознакомительное занятие</string>
+    <string name="pilot_intro_section">Вводный раздел</string>
+    <string name="pilot_week_lessons">Уроки %1$d–%2$d</string>
+    <string name="pilot_lesson_in_preparation">Урок %1$d — в подготовке</string>
     <string name="pilot_lesson_one_simple">Урок 1 — Компьютер как система</string>
     <string name="pilot_lesson_two_simple">Урок 2 — Операционная система, программы, Input и Output</string>
     <string name="pilot_lesson_three_simple">Урок 3 — Файлы, папки и первый terminal</string>
