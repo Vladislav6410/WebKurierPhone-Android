@@ -4,9 +4,6 @@ import android.content.Context
 import com.webkurier.android.coreEndpoints.EndpointsLoader
 import com.webkurier.android.coreEndpoints.EndpointsModel
 import com.webkurier.android.coreEndpoints.EndpointsModelDefaults
-import com.webkurier.android.coreEndpoints.EndpointSource
-import com.webkurier.android.coreEndpoints.LocalAssetEndpointSource
-import com.webkurier.android.coreEndpoints.StaticEndpointSource
 import com.webkurier.android.coreEndpoints.tryLoadEndpoints
 import com.webkurier.android.coreSecure.SecureStore
 import com.webkurier.android.coreSecure.SecureTokenProvider
